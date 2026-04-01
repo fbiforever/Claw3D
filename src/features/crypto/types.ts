@@ -149,6 +149,85 @@ export type CryptoRoomSettings = {
   agentSettings: CryptoAgentSetting[];
 };
 
+export type CryptoLaunchNetwork = "devnet" | "mainnet";
+
+export type CryptoLaunchExecutionMode = "user_approved" | "server_side";
+
+export type CryptoLaunchDraft = {
+  network: CryptoLaunchNetwork;
+  executionMode: CryptoLaunchExecutionMode;
+  name: string;
+  symbol: string;
+  description: string;
+  logoUrl: string;
+  website: string;
+  twitter: string;
+  telegram: string;
+  discord: string;
+  creatorWallet: string;
+  priorityFeeSol: number;
+  computeUnitLimit: number;
+};
+
+export type CryptoLaunchQuestionId =
+  | "network"
+  | "executionMode"
+  | "name"
+  | "symbol"
+  | "description"
+  | "logoUrl"
+  | "website"
+  | "twitter"
+  | "telegram"
+  | "discord"
+  | "confirm";
+
+export type CryptoLaunchConversationState = {
+  active: boolean;
+  agentId: string | null;
+  awaitingField: CryptoLaunchQuestionId | null;
+  lastUpdatedAt: number | null;
+};
+
+export type CryptoLaunchPrepared = {
+  launchId: string;
+  network: CryptoLaunchNetwork;
+  executionMode: CryptoLaunchExecutionMode;
+  mintAddress: string;
+  metadataUri: string;
+  creatorPublicKey: string;
+  explorerBaseUrl: string;
+  explorerCluster: string | null;
+  explorerTokenUrl: string;
+  explorerTxUrl: string | null;
+  expiresAt: number;
+  serializedTransaction: string | null;
+  status: "awaiting_signature" | "ready_for_server_submit";
+};
+
+export type CryptoLaunchResult = {
+  launchId: string;
+  network: CryptoLaunchNetwork;
+  executionMode: CryptoLaunchExecutionMode;
+  mintAddress: string;
+  creatorPublicKey: string;
+  metadataUri: string;
+  signature: string;
+  explorerBaseUrl: string;
+  explorerCluster: string | null;
+  explorerTokenUrl: string;
+  explorerTxUrl: string;
+  confirmed: boolean;
+  submittedAt: string;
+};
+
+export type CryptoLaunchDraftState = {
+  draft: CryptoLaunchDraft;
+  conversation: CryptoLaunchConversationState;
+  lastPrepared: CryptoLaunchPrepared | null;
+  lastResult: CryptoLaunchResult | null;
+};
+
 export type CryptoReportSnapshot = {
   trackedTokenSymbol: string;
   tradeCount: number;

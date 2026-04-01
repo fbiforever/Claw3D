@@ -12,12 +12,14 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CRYPTO_ROOM_DEXSCREENER_URL,
   CRYPTO_ROOM_PAIR_ADDRESS,
 } from "@/features/crypto/lib/constants";
 import { useCryptoRoomState } from "@/features/crypto/hooks/useCryptoRoomState";
+import { useCryptoLaunchState } from "@/features/crypto/hooks/useCryptoLaunchState";
+import { getLaunchFieldLabel, getMissingRequiredLaunchField } from "@/features/crypto/lib/launchSchema";
 import type { CryptoAgentTradeMode, CryptoTrackedPair } from "@/features/crypto/types";
 import type { OfficeAgent } from "@/features/retro-office/core/types";
 
@@ -38,7 +40,7 @@ const number = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 4,
 });
 
-type TabKey = "market" | "trade" | "ledger" | "agents";
+type TabKey = "market" | "trade" | "ledger" | "agents" | "launch";
 
 const DEXSCREENER_SOLANA_URL_RE =
   /^https?:\/\/(?:www\.)?dexscreener\.com\/solana\/([a-zA-Z0-9]{16,128})(?:[/?#].*)?$/i;
@@ -79,6 +81,7 @@ export function CryptoImmersiveScreen({ agents }: { agents: OfficeAgent[] }) {
   const [browsedPairLoading, setBrowsedPairLoading] = useState(false);
   const [browsedPairError, setBrowsedPairError] = useState<string | null>(null);
   const state = useCryptoRoomState(agents);
+  const launch = useCryptoLaunchState();
 
   const pendingApprovals = useMemo(
     () => state.approvals.filter((approval) => approval.status === "pending"),
@@ -380,6 +383,11 @@ export function CryptoImmersiveScreen({ agents }: { agents: OfficeAgent[] }) {
               label: "Agents",
               icon: <Bot className="h-4 w-4" />,
             },
+            {
+              key: "launch" as const,
+              label: "Launch",
+              icon: <Sparkles className="h-4 w-4" />,
+            },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -416,6 +424,8 @@ export function CryptoImmersiveScreen({ agents }: { agents: OfficeAgent[] }) {
             <TradeTab state={state} pendingApprovals={pendingApprovals} />
           ) : activeTab === "ledger" ? (
             <LedgerTab state={state} />
+          ) : activeTab === "launch" ? (
+            <LaunchTab launch={launch} />
           ) : (
             <AgentsTab state={state} />
           )}
@@ -424,6 +434,20 @@ export function CryptoImmersiveScreen({ agents }: { agents: OfficeAgent[] }) {
     </div>
   );
 }
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read the selected image file."));
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Unable to read the selected image file."));
+    };
+    reader.readAsDataURL(file);
+  });
 
 function MarketTab({
   state,
@@ -614,6 +638,363 @@ function MarketTab({
               stored PnL history.
             </Banner>
           </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+function LaunchTab({
+  launch,
+}: {
+  launch: ReturnType<typeof useCryptoLaunchState>;
+}) {
+  const [tipFloor, setTipFloor] = useState<number | null>(null);
+  const [tipFloorError, setTipFloorError] = useState<string | null>(null);
+  const missingField = getMissingRequiredLaunchField(launch.draft);
+  const effectiveTipFloor = launch.draft.network === "mainnet" ? tipFloor : null;
+  const effectiveTipFloorError =
+    launch.draft.network === "mainnet" ? tipFloorError : null;
+
+  useEffect(() => {
+    if (launch.draft.network !== "mainnet") {
+      return;
+    }
+    let cancelled = false;
+    void fetch("/api/crypto/launch/tip-floor", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as {
+          landed_tips_50th_percentile?: number;
+          error?: string;
+        } | null;
+        if (!response.ok) {
+          throw new Error(payload?.error?.trim() || "Unable to load the Jito tip floor.");
+        }
+        if (!cancelled) {
+          setTipFloor(payload?.landed_tips_50th_percentile ?? null);
+          setTipFloorError(null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setTipFloor(null);
+          setTipFloorError(error instanceof Error ? error.message : "Unable to load the Jito tip floor.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [launch.draft.network]);
+
+  return (
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_420px]">
+      <SectionCard
+        title="Pump.fun launcher"
+        subtitle="Build the token metadata here, choose how execution works, then launch from the same draft the chat flow uses."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={launch.resetDraft}
+              className="rounded-full border border-white/12 bg-white/6 px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/75 transition-colors hover:bg-white/10"
+            >
+              Reset draft
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                launch.clearLaunchError();
+                void launch.submitLaunch().catch(() => {});
+              }}
+              disabled={launch.launchBusy || Boolean(missingField)}
+              className="rounded-full border border-cyan-300/25 bg-cyan-300/12 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition-colors hover:bg-cyan-300/16 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {launch.launchBusy ? "Launching" : "Launch token"}
+            </button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <LabeledField label="Network">
+            <select
+              value={launch.draft.network}
+              onChange={(event) =>
+                launch.setDraft((current) => ({
+                  ...current,
+                  network: event.target.value === "mainnet" ? "mainnet" : "devnet",
+                }))
+              }
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/35"
+            >
+              <option value="devnet">Devnet</option>
+              <option value="mainnet">Mainnet</option>
+            </select>
+          </LabeledField>
+          <LabeledField label="Execution mode">
+            <select
+              value={launch.draft.executionMode}
+              onChange={(event) =>
+                launch.setDraft((current) => ({
+                  ...current,
+                  executionMode:
+                    event.target.value === "server_side" ? "server_side" : "user_approved",
+                }))
+              }
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/35"
+            >
+              <option value="user_approved">User-approved wallet</option>
+              <option value="server_side">Server-side signer</option>
+            </select>
+          </LabeledField>
+          <LabeledField label="Token name">
+            <input
+              value={launch.draft.name}
+              onChange={(event) =>
+                launch.setDraft((current) => ({ ...current, name: event.target.value }))
+              }
+              maxLength={32}
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="Claw Coin"
+            />
+          </LabeledField>
+          <LabeledField label="Token symbol">
+            <input
+              value={launch.draft.symbol}
+              onChange={(event) =>
+                launch.setDraft((current) => ({
+                  ...current,
+                  symbol: event.target.value.toUpperCase(),
+                }))
+              }
+              maxLength={10}
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] uppercase text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="CLAW"
+            />
+          </LabeledField>
+        </div>
+        <div className="mt-4">
+          <LabeledField label="Description">
+            <textarea
+              value={launch.draft.description}
+              onChange={(event) =>
+                launch.setDraft((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
+              }
+              rows={5}
+              maxLength={280}
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="Tell the story behind the token."
+            />
+          </LabeledField>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <LabeledField label="Logo URL">
+            <input
+              value={launch.draft.logoUrl}
+              onChange={(event) =>
+                launch.setDraft((current) => ({ ...current, logoUrl: event.target.value }))
+              }
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="https://..."
+            />
+          </LabeledField>
+          <LabeledField label="Upload logo">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                void readFileAsDataUrl(file)
+                  .then((logoUrl) => {
+                    launch.setDraft((current) => ({ ...current, logoUrl }));
+                  })
+                  .catch(() => {});
+              }}
+              className="block w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white file:mr-3 file:rounded-full file:border-0 file:bg-cyan-300/14 file:px-3 file:py-1 file:text-[11px] file:font-semibold file:uppercase file:tracking-[0.14em] file:text-cyan-100"
+            />
+          </LabeledField>
+          <LabeledField label="Website">
+            <input
+              value={launch.draft.website}
+              onChange={(event) =>
+                launch.setDraft((current) => ({ ...current, website: event.target.value }))
+              }
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="https://..."
+            />
+          </LabeledField>
+          <LabeledField label="Twitter/X">
+            <input
+              value={launch.draft.twitter}
+              onChange={(event) =>
+                launch.setDraft((current) => ({ ...current, twitter: event.target.value }))
+              }
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="https://x.com/..."
+            />
+          </LabeledField>
+          <LabeledField label="Telegram">
+            <input
+              value={launch.draft.telegram}
+              onChange={(event) =>
+                launch.setDraft((current) => ({ ...current, telegram: event.target.value }))
+              }
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="https://t.me/..."
+            />
+          </LabeledField>
+          <LabeledField label="Discord">
+            <input
+              value={launch.draft.discord}
+              onChange={(event) =>
+                launch.setDraft((current) => ({ ...current, discord: event.target.value }))
+              }
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors placeholder:text-white/30 focus:border-cyan-300/35"
+              placeholder="https://discord.gg/..."
+            />
+          </LabeledField>
+          <LabeledField label="Priority fee (SOL)">
+            <input
+              value={launch.draft.priorityFeeSol}
+              onChange={(event) =>
+                launch.setDraft((current) => ({
+                  ...current,
+                  priorityFeeSol: Number(event.target.value) || 0,
+                }))
+              }
+              inputMode="decimal"
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/35"
+            />
+          </LabeledField>
+          <LabeledField label="Compute units">
+            <input
+              value={launch.draft.computeUnitLimit}
+              onChange={(event) =>
+                launch.setDraft((current) => ({
+                  ...current,
+                  computeUnitLimit: Number(event.target.value) || 0,
+                }))
+              }
+              inputMode="numeric"
+              className="w-full rounded-2xl border border-white/12 bg-[#071019] px-4 py-3 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/35"
+            />
+          </LabeledField>
+        </div>
+      </SectionCard>
+
+      <div className="space-y-6">
+        <SectionCard
+          title="Launch review"
+          subtitle="Required fields, runtime notes, and the last prepared or submitted launch."
+        >
+          <div className="space-y-3">
+            {launch.conversation.active ? (
+              <Banner tone="neutral">
+                An agent is currently building this token draft and is waiting for{" "}
+                {launch.conversation.awaitingField
+                  ? getLaunchFieldLabel(launch.conversation.awaitingField)
+                  : "confirmation"}
+                .
+              </Banner>
+            ) : null}
+            {missingField ? (
+              <Banner tone="danger">
+                Fill in the {getLaunchFieldLabel(missingField)} field before launching.
+              </Banner>
+            ) : (
+              <Banner tone="success">
+                The required token fields are complete and ready for launch review.
+              </Banner>
+            )}
+            {launch.draft.executionMode === "user_approved" ? (
+              <Banner tone="neutral">
+                Wallet-approved launches will connect to Phantom, prepare the Pump.fun transaction, and ask for an explicit signature before submission.
+              </Banner>
+            ) : (
+              <Banner tone="danger">
+                Server-side launches require `PUMPFUN_SERVER_SECRET_KEY` on the server and will use that wallet as the token creator.
+              </Banner>
+            )}
+            {launch.draft.network === "mainnet" ? (
+              effectiveTipFloor !== null ? (
+                <Banner tone="neutral">
+                  Current Jito p50 tip floor: {effectiveTipFloor.toFixed(6)} SOL.
+                </Banner>
+              ) : effectiveTipFloorError ? (
+                <Banner tone="danger">{effectiveTipFloorError}</Banner>
+              ) : null
+            ) : (
+              <Banner tone="neutral">
+                Devnet is the safest place to validate the full flow before launching on mainnet.
+              </Banner>
+            )}
+            {launch.launchError ? <Banner tone="danger">{launch.launchError}</Banner> : null}
+          </div>
+          <div className="mt-4 space-y-2">
+            <StatRow label="Mode" value={launch.draft.executionMode === "server_side" ? "Server-side" : "User-approved"} />
+            <StatRow label="Network" value={launch.draft.network} />
+            <StatRow
+              label="Creator wallet"
+              value={launch.lastResult?.creatorPublicKey || launch.draft.creatorWallet || "Resolved at launch time"}
+            />
+            <StatRow label="Token name" value={launch.draft.name || "Pending"} />
+            <StatRow label="Ticker" value={launch.draft.symbol || "Pending"} />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Latest launch"
+          subtitle="This reflects the most recent prepared or submitted token launch from this browser."
+        >
+          {launch.lastResult ? (
+            <div className="space-y-3">
+              <Banner tone="success">
+                Launch submitted for {launch.lastResult.mintAddress}. You can review the mint and transaction links below.
+              </Banner>
+              <StatRow label="Mint address" value={shorten(launch.lastResult.mintAddress)} />
+              <StatRow label="Creator" value={shorten(launch.lastResult.creatorPublicKey)} />
+              <StatRow label="Submitted" value={new Date(launch.lastResult.submittedAt).toLocaleString()} />
+              <a
+                href={launch.lastResult.explorerTokenUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-cyan-100 transition-colors hover:bg-white/[0.06]"
+              >
+                Open token explorer
+              </a>
+              <a
+                href={launch.lastResult.explorerTxUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-cyan-100 transition-colors hover:bg-white/[0.06]"
+              >
+                Open transaction explorer
+              </a>
+            </div>
+          ) : launch.lastPrepared ? (
+            <div className="space-y-3">
+              <Banner tone="neutral">
+                The last prepared launch is waiting for{" "}
+                {launch.lastPrepared.executionMode === "server_side"
+                  ? "server-side submission"
+                  : "wallet approval"}
+                .
+              </Banner>
+              <StatRow label="Mint address" value={shorten(launch.lastPrepared.mintAddress)} />
+              <StatRow label="Metadata URI" value={shorten(launch.lastPrepared.metadataUri)} />
+              <StatRow
+                label="Expires"
+                value={new Date(launch.lastPrepared.expiresAt).toLocaleTimeString()}
+              />
+            </div>
+          ) : (
+            <Banner tone="neutral">
+              No Pump.fun token has been prepared in this browser yet.
+            </Banner>
+          )}
         </SectionCard>
       </div>
     </div>

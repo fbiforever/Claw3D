@@ -5251,13 +5251,19 @@ export function RetroOffice3D({
   ]);
 
   useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tagName = target.tagName;
+      return (
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        tagName === "SELECT" ||
+        target.isContentEditable
+      );
+    };
     const onDown = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
-      if (
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA"
-      )
-        return;
+      if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return;
       e.preventDefault();
       setSpaceDown(true);
     };

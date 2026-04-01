@@ -6,9 +6,11 @@ import {
   hasInstallableMissingBinary,
   type SkillReadinessState,
 } from "@/lib/skills/presentation";
+import { getPackagedSkillBySkillKey } from "@/lib/skills/catalog";
 import type { SkillStatusEntry } from "@/lib/skills/types";
 
 export type SkillMarketplaceCollectionId =
+  | "claw3d"
   | "featured"
   | "installed"
   | "setup-required"
@@ -26,6 +28,9 @@ export type SkillMarketplaceMetadata = {
   editorBadge?: string;
   rating?: number;
   installs?: number;
+  poweredByName?: string;
+  poweredByUrl?: string;
+  hideStats?: boolean;
 };
 
 export type SkillMarketplaceEntry = {
@@ -37,11 +42,18 @@ export type SkillMarketplaceEntry = {
   missingDetails: string[];
 };
 
-const SKILL_MARKETPLACE_OVERRIDES: Record<string, Partial<SkillMarketplaceMetadata>> = {
+const SKILL_MARKETPLACE_OVERRIDES: Record<
+  string,
+  Partial<SkillMarketplaceMetadata>
+> = {
   github: {
     category: "Engineering",
     tagline: "Turns repository operations into a one-step teammate workflow.",
-    capabilities: ["Pull request support", "Issue context", "Repository operations"],
+    capabilities: [
+      "Pull request support",
+      "Issue context",
+      "Repository operations",
+    ],
     featured: true,
     editorBadge: "Popular",
     rating: 4.9,
@@ -59,18 +71,58 @@ const SKILL_MARKETPLACE_OVERRIDES: Record<string, Partial<SkillMarketplaceMetada
   slack: {
     category: "Communication",
     tagline: "Keeps agents plugged into team channels and notifications.",
-    capabilities: ["Channel updates", "Message drafting", "Notification routing"],
+    capabilities: [
+      "Channel updates",
+      "Message drafting",
+      "Notification routing",
+    ],
     featured: true,
     rating: 4.7,
     installs: 14110,
   },
   linear: {
     category: "Planning",
-    tagline: "Brings issue tracking and execution loops directly into agent workflows.",
+    tagline:
+      "Brings issue tracking and execution loops directly into agent workflows.",
     capabilities: ["Issue lookup", "Status updates", "Planning workflows"],
     featured: true,
     rating: 4.7,
     installs: 11980,
+  },
+  "todo-board": {
+    category: "Productivity",
+    tagline:
+      "Gives agents a shared workspace TODO board with blocked-task tracking.",
+    capabilities: [
+      "Task capture",
+      "Blocked tracking",
+      "Shared workspace state",
+    ],
+    featured: true,
+    editorBadge: "Claw3D test",
+    hideStats: true,
+  },
+  "task-manager": {
+    category: "Productivity",
+    tagline:
+      "Turns actionable requests into persistent shared tasks that power the Claw3D Kanban board.",
+    capabilities: [
+      "Automatic task capture",
+      "Task lifecycle tracking",
+      "Shared Kanban state",
+    ],
+    featured: true,
+    editorBadge: "Kanban core",
+    hideStats: true,
+  },
+  soundclaw: {
+    category: "Audio",
+    tagline:
+      "Lets agents search Spotify, control playback, and return music links on the current channel.",
+    capabilities: ["Spotify search", "Playback control", "Same-channel link sharing"],
+    featured: true,
+    editorBadge: "Office demo",
+    hideStats: true,
   },
 };
 
@@ -109,7 +161,9 @@ const buildFallbackCapabilities = (skill: SkillStatusEntry): string[] => {
   return capabilities.slice(0, 3);
 };
 
-const buildFallbackMetadata = (skill: SkillStatusEntry): SkillMarketplaceMetadata => {
+const buildFallbackMetadata = (
+  skill: SkillStatusEntry,
+): SkillMarketplaceMetadata => {
   const normalizedKey = skill.skillKey.trim().toLowerCase();
   const source = skill.source.trim();
   const seed = hashString(`${normalizedKey}:${source}`);
@@ -133,7 +187,9 @@ const buildFallbackMetadata = (skill: SkillStatusEntry): SkillMarketplaceMetadat
           : "Community";
   return {
     category,
-    tagline: skill.description.trim() || `${titleCaseWords(skill.name)} capability pack.`,
+    tagline:
+      skill.description.trim() ||
+      `${titleCaseWords(skill.name)} capability pack.`,
     trustLabel,
     capabilities: buildFallbackCapabilities(skill),
     featured: skill.bundled || source === "openclaw-managed",
@@ -142,33 +198,53 @@ const buildFallbackMetadata = (skill: SkillStatusEntry): SkillMarketplaceMetadat
   };
 };
 
-export const resolveSkillMarketplaceMetadata = (skill: SkillStatusEntry): SkillMarketplaceMetadata => {
+export const resolveSkillMarketplaceMetadata = (
+  skill: SkillStatusEntry,
+): SkillMarketplaceMetadata => {
   const normalizedKey = skill.skillKey.trim().toLowerCase();
   const fallback = buildFallbackMetadata(skill);
   const override = SKILL_MARKETPLACE_OVERRIDES[normalizedKey];
+  const packagedSkill = getPackagedSkillBySkillKey(skill.skillKey);
   if (!override) {
-    return fallback;
+    return {
+      ...fallback,
+      poweredByName: packagedSkill?.creatorName,
+      poweredByUrl: packagedSkill?.creatorUrl,
+      hideStats: Boolean(packagedSkill),
+    };
   }
   return {
     ...fallback,
     ...override,
     capabilities: override.capabilities ?? fallback.capabilities,
+    poweredByName: packagedSkill?.creatorName,
+    poweredByUrl: packagedSkill?.creatorUrl,
+    hideStats: override.hideStats ?? Boolean(packagedSkill),
   };
 };
 
-export const buildSkillMarketplaceEntry = (skill: SkillStatusEntry): SkillMarketplaceEntry => {
+export const buildSkillMarketplaceEntry = (
+  skill: SkillStatusEntry,
+): SkillMarketplaceEntry => {
+  const packagedSkill = getPackagedSkillBySkillKey(skill.skillKey);
+  const missingDetails = buildSkillMissingDetails(skill);
+  if (packagedSkill && !skill.baseDir.trim()) {
+    missingDetails.unshift(
+      "Install this packaged Claw3D skill to make it available on the gateway.",
+    );
+  }
   return {
     skill,
     readiness: deriveSkillReadinessState(skill),
     metadata: resolveSkillMarketplaceMetadata(skill),
     installable: hasInstallableMissingBinary(skill),
     removable: canRemoveSkill(skill),
-    missingDetails: buildSkillMissingDetails(skill),
+    missingDetails,
   };
 };
 
 export const buildSkillMarketplaceCollections = (
-  skills: SkillStatusEntry[]
+  skills: SkillStatusEntry[],
 ): Array<{
   id: SkillMarketplaceCollectionId;
   label: string;
@@ -182,19 +258,40 @@ export const buildSkillMarketplaceCollections = (
     entries: SkillMarketplaceEntry[];
   }> = [];
 
-  const featured = entries.filter((entry) => entry.metadata.featured).slice(0, 6);
+  const featured = entries
+    .filter((entry) => entry.metadata.featured)
+    .slice(0, 6);
   if (featured.length > 0) {
     collections.push({ id: "featured", label: "Featured", entries: featured });
   }
 
-  const installed = entries.filter((entry) => entry.readiness === "ready" || entry.skill.disabled);
-  if (installed.length > 0) {
-    collections.push({ id: "installed", label: "Installed", entries: installed });
+  const claw3d = entries.filter((entry) =>
+    getPackagedSkillBySkillKey(entry.skill.skillKey),
+  );
+  if (claw3d.length > 0) {
+    collections.push({ id: "claw3d", label: "Claw3D", entries: claw3d });
   }
 
-  const setupRequired = entries.filter((entry) => entry.readiness === "needs-setup");
+  const installed = entries.filter(
+    (entry) => entry.readiness === "ready" || entry.skill.disabled,
+  );
+  if (installed.length > 0) {
+    collections.push({
+      id: "installed",
+      label: "Installed",
+      entries: installed,
+    });
+  }
+
+  const setupRequired = entries.filter(
+    (entry) => entry.readiness === "needs-setup",
+  );
   if (setupRequired.length > 0) {
-    collections.push({ id: "setup-required", label: "Needs setup", entries: setupRequired });
+    collections.push({
+      id: "setup-required",
+      label: "Needs setup",
+      entries: setupRequired,
+    });
   }
 
   for (const group of sourceGroups) {

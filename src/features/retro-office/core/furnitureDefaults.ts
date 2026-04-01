@@ -54,6 +54,20 @@ const DEFAULT_SMS_BOOTH: FurnitureSeed = {
   facing: 0,
 };
 
+const DEFAULT_JUKEBOX: FurnitureSeed = {
+  type: "jukebox",
+  x: 20,
+  y: 380,
+  facing: 90,
+};
+
+const DEFAULT_KANBAN_BOARD: FurnitureSeed = {
+  type: "kanban_board",
+  x: 460,
+  y: -60,
+  facing: 180,
+};
+
 const PREVIOUS_SERVER_ROOM_ITEMS_BOTTOM_RIGHT: FurnitureSeed[] = [
   { type: "wall", x: 820, y: 540, w: 280, h: WALL_THICKNESS },
   { type: "wall", x: 820, y: 540, w: WALL_THICKNESS, h: 70 },
@@ -168,8 +182,7 @@ const LEGACY_QA_LAB_ITEMS: FurnitureSeed[] = [
 ];
 
 const EAST_WING_ROOM_BOTTOM_Y = EAST_WING_ROOM_TOP_Y + EAST_WING_ROOM_HEIGHT;
-const EAST_WING_ROOM_BOTTOM_WALL_Y =
-  EAST_WING_ROOM_BOTTOM_Y - WALL_THICKNESS;
+const EAST_WING_ROOM_BOTTOM_WALL_Y = EAST_WING_ROOM_BOTTOM_Y - WALL_THICKNESS;
 const EAST_WING_DOOR_BOTTOM_Y = EAST_WING_DOOR_Y + DOOR_LENGTH;
 const EAST_WING_TOP_WALL_HEIGHT = EAST_WING_DOOR_Y - EAST_WING_ROOM_TOP_Y;
 const EAST_WING_BOTTOM_WALL_HEIGHT =
@@ -460,10 +473,9 @@ const DEFAULT_FURNITURE: FurnitureSeed[] = [
   { type: "chair", x: 120, y: 480, facing: 180 },
   { type: "chair", x: 50, y: 150, facing: 105 },
   { type: "chair", x: 60, y: 80, facing: 60 },
-  { type: "executive_desk", x: 420, y: 60, w: 130, h: 65 },
-  { type: "chair", x: 540, y: 60, facing: 0 },
-  { type: "bookshelf", x: 500, y: 30, w: 80, h: 120 },
-  { type: "couch", x: 290, y: 110, w: 40, h: 80, vertical: true, facing: 180 },
+  { type: "chair", x: 550, y: 50, facing: 0 },
+  { type: "bookshelf", x: 600, y: 30, w: 80, h: 120 },
+  { type: "couch", x: 270, y: 90, w: 40, h: 80, vertical: true, facing: 180 },
   { type: "fridge", x: 1050, y: 20, w: 40, h: 80 },
   { type: "stove", x: 920, y: 20 },
   { type: "cabinet", x: 980, y: 30, w: 40, h: 40 },
@@ -474,7 +486,11 @@ const DEFAULT_FURNITURE: FurnitureSeed[] = [
   { type: "coffee_machine", x: 880, y: 30, elevation: 0.56 },
   { type: "wall_cabinet", x: 960, y: 10, w: 80, h: 20, elevation: 0.9 },
   { type: "wall_cabinet", x: 880, y: 10, w: 80, h: 20, elevation: 0.9 },
-  ...DEFAULT_DINING_ITEMS,
+  { type: "round_table", x: 890, y: 100, r: 50 },
+  { type: "chair", x: 930, y: 100, facing: 0 },
+  { type: "chair", x: 930, y: 180, facing: 180 },
+  { type: "chair", x: 880, y: 130, facing: 90 },
+  { type: "chair", x: 970, y: 130, facing: 270 },
   { type: "vending", x: 790, y: 10 },
   { type: "trash", x: 210, y: 20 },
   { type: "desk_cubicle", x: 100, y: 300, id: "desk_0" },
@@ -527,11 +543,12 @@ const DEFAULT_FURNITURE: FurnitureSeed[] = [
   { type: "couch", x: 1000, y: 380, w: 100, h: 40, facing: 90 },
   { type: "couch", x: 390, y: 630, w: 100, h: 40 },
   { type: "table_rect", x: 980, y: 380, w: 60, h: 30, facing: 270 },
-  DEFAULT_PINGPONG_TABLE,
+  { type: "pingpong", x: 950, y: 600, w: 100, h: 60 },
   { type: "beanbag", x: 1000, y: 330, color: "#e65100", facing: 90 },
   { type: "beanbag", x: 1000, y: 410, color: "#1565c0", facing: 90 },
   DEFAULT_ATM_MACHINE,
   DEFAULT_PHONE_BOOTH,
+  DEFAULT_KANBAN_BOARD,
   { type: "whiteboard", x: 40, y: 200, w: 10, h: 60 },
   { type: "clock", x: 550, y: 5 },
   { type: "lamp", x: 430, y: 100 },
@@ -617,15 +634,10 @@ const CRYPTO_ROOM_SIGNATURES = new Set(
   DEFAULT_CRYPTO_ROOM_ITEMS.map(createFurnitureSignature),
 );
 
-const hasSignature = (
-  items: FurnitureItem[],
-  signatures: Set<string>,
-) => items.some((item) => signatures.has(createFurnitureSignature(item)));
+const hasSignature = (items: FurnitureItem[], signatures: Set<string>) =>
+  items.some((item) => signatures.has(createFurnitureSignature(item)));
 
-const hasAllSignatures = (
-  items: FurnitureItem[],
-  signatures: Set<string>,
-) => {
+const hasAllSignatures = (items: FurnitureItem[], signatures: Set<string>) => {
   const itemSignatures = new Set(items.map(createFurnitureSignature));
   return [...signatures].every((signature) => itemSignatures.has(signature));
 };
@@ -633,8 +645,7 @@ const hasAllSignatures = (
 const replaceBySignatureSet = (
   items: FurnitureItem[],
   signatures: Set<string>,
-) =>
-  items.filter((item) => !signatures.has(createFurnitureSignature(item)));
+) => items.filter((item) => !signatures.has(createFurnitureSignature(item)));
 
 export const ensureOfficePingPongTable = (
   items: FurnitureItem[],
@@ -649,7 +660,19 @@ export const ensureOfficeAtm = (items: FurnitureItem[]): FurnitureItem[] => {
   return [...items, { ...DEFAULT_ATM_MACHINE, _uid: nextUid() }];
 };
 
-export const ensureOfficePhoneBooth = (items: FurnitureItem[]): FurnitureItem[] => {
+export const ensureOfficeJukebox = (items: FurnitureItem[]): FurnitureItem[] => {
+  if (items.some((item) => item.type === "jukebox")) return items;
+  return [...items, { ...DEFAULT_JUKEBOX, _uid: nextUid() }];
+};
+
+export const ensureOfficeKanbanBoard = (items: FurnitureItem[]): FurnitureItem[] => {
+  if (items.some((item) => item.type === "kanban_board")) return items;
+  return [...items, { ...DEFAULT_KANBAN_BOARD, _uid: nextUid() }];
+};
+
+export const ensureOfficePhoneBooth = (
+  items: FurnitureItem[],
+): FurnitureItem[] => {
   let found = false;
   const nextItems = items.map((item) => {
     if (item.type === "phone_booth") {
@@ -666,7 +689,9 @@ export const ensureOfficePhoneBooth = (items: FurnitureItem[]): FurnitureItem[] 
   return [...nextItems, { ...DEFAULT_PHONE_BOOTH, _uid: nextUid() }];
 };
 
-export const ensureOfficeSmsBooth = (items: FurnitureItem[]): FurnitureItem[] => {
+export const ensureOfficeSmsBooth = (
+  items: FurnitureItem[],
+): FurnitureItem[] => {
   if (items.some((item) => item.type === "sms_booth")) return items;
   if (hasSmsBoothMigrationApplied()) return items;
   return [...items, { ...DEFAULT_SMS_BOOTH, _uid: nextUid() }];
@@ -725,7 +750,10 @@ export const ensureOfficeGymRoom = (
   const hasCurrentGymRoom = hasSignature(items, GYM_ROOM_SIGNATURES);
   if (hasCurrentGymRoom) return items;
 
-  const hasPreviousGymRoom = hasAllSignatures(items, PREVIOUS_GYM_ROOM_SIGNATURES);
+  const hasPreviousGymRoom = hasAllSignatures(
+    items,
+    PREVIOUS_GYM_ROOM_SIGNATURES,
+  );
   if (hasPreviousGymRoom) {
     return [
       ...replaceBySignatureSet(items, PREVIOUS_GYM_ROOM_SIGNATURES),
@@ -837,4 +865,3 @@ export const ensureOfficeCryptoRoom = (
     ...DEFAULT_CRYPTO_ROOM_ITEMS.map((item) => ({ ...item, _uid: nextUid() })),
   ];
 };
-

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { CANVAS_H, CANVAS_W } from "@/features/retro-office/core/constants";
 import { astar, buildNavGrid } from "@/features/retro-office/core/navigation";
 import { ITEM_METADATA } from "@/features/retro-office/core/geometry";
 import type { FurnitureItem } from "@/features/retro-office/core/types";
@@ -24,8 +25,6 @@ const isBlocked = (
   wh = 30,
 ): boolean => {
   const GRID_CELL = 25;
-  const CANVAS_W = 1800;
-  const CANVAS_H = 720;
   const GRID_COLS = Math.ceil(CANVAS_W / GRID_CELL);
   const GRID_ROWS = Math.ceil(CANVAS_H / GRID_CELL);
 
@@ -152,14 +151,14 @@ describe("buildNavGrid – near-boundary placement (issue #4)", () => {
   it("blocking item near the grid edge does not cause out-of-bounds errors", () => {
     // Place a large item near the right/bottom edges of the canvas.
     // buildNavGrid clamps cells to valid indices — this must not throw.
-    const nearEdge = makeItem("cabinet", 1760, 680); // close to CANVAS_W=1800, CANVAS_H=720
+    const nearEdge = makeItem("cabinet", CANVAS_W - 40, CANVAS_H - 40);
     expect(() => buildNavGrid([nearEdge])).not.toThrow();
 
     const grid = buildNavGrid([nearEdge]);
     // The grid array length must still be correct.
     const GRID_CELL = 25;
-    const GRID_COLS = Math.ceil(1800 / GRID_CELL);
-    const GRID_ROWS = Math.ceil(720 / GRID_CELL);
+    const GRID_COLS = Math.ceil(CANVAS_W / GRID_CELL);
+    const GRID_ROWS = Math.ceil(CANVAS_H / GRID_CELL);
     expect(grid.length).toBe(GRID_COLS * GRID_ROWS);
   });
 
@@ -204,17 +203,19 @@ describe("buildNavGrid + astar – full pathfinding integration (issue #4)", () 
 });
 
 describe("buildNavGrid – specific non-blocking item types (issue #4)", () => {
-  it("desk_cubicle does NOT block navigation — agents stand at these", () => {
+  it("desk_cubicle blocks navigation with zero padding — agents route around desks", () => {
     /*
-     * desk_cubicle has blocksNavigation: false in ITEM_METADATA.
-     * Agents interact with desks by standing beside them; the desk itself
-     * is not a solid blocker in the pathfinding grid.
+     * desk_cubicle has blocksNavigation: true with navPadding: 0 in ITEM_METADATA.
+     * The desk body is blocked in the nav grid so agents route around it,
+     * but zero padding keeps aisles between desks navigable.
+     * Agents sit at the chair position (y - 5), which is above the blocked zone.
      */
     const item = makeItem("desk_cubicle", 400, 300);
     const grid = buildNavGrid([item]);
-    expect(isBlocked(grid, 400, 300)).toBe(false);
+    expect(isBlocked(grid, 400, 300)).toBe(true);
     // Confirm via metadata as the authoritative source.
-    expect(ITEM_METADATA["desk_cubicle"]?.blocksNavigation).toBe(false);
+    expect(ITEM_METADATA["desk_cubicle"]?.blocksNavigation).toBe(true);
+    expect(ITEM_METADATA["desk_cubicle"]?.navPadding).toBe(0);
   });
 
   it("door does NOT block navigation — agents must be able to walk through doors", () => {

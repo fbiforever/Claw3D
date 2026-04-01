@@ -67,6 +67,7 @@ export const ITEM_FOOTPRINT: Record<string, [number, number]> = {
   server_rack: [45, 90],
   server_terminal: [42, 34],
   qa_terminal: [54, 38],
+  kanban_board: [130, 65],
   device_rack: [70, 36],
   test_bench: [90, 42],
   crypto_board: [22, 84],
@@ -76,6 +77,7 @@ export const ITEM_FOOTPRINT: Record<string, [number, number]> = {
   dumbbell_rack: [80, 28],
   exercise_bike: [45, 65],
   punching_bag: [28, 28],
+  jukebox: [60, 40],
   rowing_machine: [90, 34],
   kettlebell_rack: [70, 26],
   yoga_mat: [70, 30],
@@ -108,7 +110,7 @@ export const getItemBaseSize = (item: FurnitureItem) => {
  * This is the single source of truth for nav-blocking behaviour. `buildNavGrid` in
  * navigation.ts reads this instead of maintaining its own hardcoded type set.
  */
-export const ITEM_METADATA: Record<string, { blocksNavigation: boolean }> = {
+export const ITEM_METADATA: Record<string, { blocksNavigation: boolean; navPadding?: number }> = {
   // ── structural ────────────────────────────────────────────────────────────
   wall:            { blocksNavigation: true  },
   door:            { blocksNavigation: false }, // passable
@@ -118,7 +120,7 @@ export const ITEM_METADATA: Record<string, { blocksNavigation: boolean }> = {
   couch_v:         { blocksNavigation: true  },
   beanbag:         { blocksNavigation: true  }, // large floor seat (issue #4)
   // ── desks / workstations ──────────────────────────────────────────────────
-  desk_cubicle:    { blocksNavigation: false }, // agents stand at these; collision handled separately
+  desk_cubicle:    { blocksNavigation: true, navPadding: 0 }, // blocks nav with zero padding (tight to desk body)
   executive_desk:  { blocksNavigation: true  },
   // ── tables ────────────────────────────────────────────────────────────────
   round_table:     { blocksNavigation: true  },
@@ -150,6 +152,7 @@ export const ITEM_METADATA: Record<string, { blocksNavigation: boolean }> = {
   phone_booth:     { blocksNavigation: true  },
   // ── QA lab ────────────────────────────────────────────────────────────────
   qa_terminal:     { blocksNavigation: true  },
+  kanban_board:    { blocksNavigation: true  },
   device_rack:     { blocksNavigation: true  },
   test_bench:      { blocksNavigation: true  },
   crypto_board:    { blocksNavigation: false },
@@ -160,6 +163,7 @@ export const ITEM_METADATA: Record<string, { blocksNavigation: boolean }> = {
   dumbbell_rack:   { blocksNavigation: true  },
   exercise_bike:   { blocksNavigation: true  },
   punching_bag:    { blocksNavigation: true  },
+  jukebox:         { blocksNavigation: true  },
   rowing_machine:  { blocksNavigation: true  },
   kettlebell_rack: { blocksNavigation: true  },
   yoga_mat:        { blocksNavigation: true  },

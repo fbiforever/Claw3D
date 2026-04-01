@@ -157,9 +157,10 @@ Common environment variables:
 
 - `HOST` and `PORT` control the Studio server bind address and port.
 - `STUDIO_ACCESS_TOKEN` protects Studio when binding to a public host.
-- `NEXT_PUBLIC_GATEWAY_URL` provides the default upstream gateway URL when Studio settings are empty.
+- `NEXT_PUBLIC_GATEWAY_URL` provides the default upstream gateway URL when Studio settings are empty. **Note:** this is a build-time variable — changes require `npm run build` to take effect.
+- `CLAW3D_GATEWAY_URL` and `CLAW3D_GATEWAY_TOKEN` provide a runtime alternative to `NEXT_PUBLIC_GATEWAY_URL` that takes effect on server restart without a rebuild. These are also used as a fallback when `openclaw.json` is not present.
 - `OPENCLAW_STATE_DIR` and `OPENCLAW_CONFIG_PATH` override the default OpenClaw paths.
-- `OPENCLAW_GATEWAY_SSH_TARGET` and `OPENCLAW_GATEWAY_SSH_USER` support gateway-host operations over SSH.
+- `OPENCLAW_GATEWAY_SSH_TARGET`, `OPENCLAW_GATEWAY_SSH_USER`, `OPENCLAW_GATEWAY_SSH_PORT`, and `OPENCLAW_GATEWAY_SSH_STRICT_HOST_KEY_CHECKING` support advanced gateway-host operations over SSH when needed.
 - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, and `ELEVENLABS_MODEL_ID` enable voice reply integration.
 
 See [`.env.example`](.env.example) for the full local development template.
@@ -181,6 +182,7 @@ See [`.env.example`](.env.example) for the full local development template.
 - [`VISION.md`](VISION.md): project direction and long-term guardrails.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): system boundaries, data flow, and major trade-offs.
 - [`TUTORIAL.md`](TUTORIAL.md): detailed step-by-step setup for OpenClaw + Tailscale + Claw3D.
+- [`MULTI_AGENT_BETA.md`](MULTI_AGENT_BETA.md): remote office beta setup, connection modes, and limitations.
 - [`CODE_DOCUMENTATION.md`](CODE_DOCUMENTATION.md): practical code map, extension points, and contributor onboarding order.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): local workflow, testing, and PR expectations.
 - [`SUPPORT.md`](SUPPORT.md): where to ask for help and how to route reports.
@@ -192,6 +194,7 @@ See [`.env.example`](.env.example) for the full local development template.
 
 - The immersive retro office (`/office`) and the Phaser builder (`/office/builder`) are related but still separate stacks.
 - The app keeps gateway secrets out of browser persistent storage, but the current connection flow still loads the upstream URL/token into browser memory at runtime.
+- Local Spotify auth for `SOUNDCLAW` currently stores an access token only. Refresh-token handling is not implemented yet, so local Spotify auth may need to be repeated after the token expires.
 
 ## Troubleshooting
 
@@ -201,6 +204,36 @@ If the UI loads but Connect fails, the problem is usually on the Studio -> Gatew
 - `EPROTO` or `wrong version number` usually means `wss://` was used against a non-TLS endpoint.
 - `401 Studio access token required` usually means `STUDIO_ACCESS_TOKEN` is enabled and the request is missing the expected `studio_access` cookie.
 - Helpful proxy error codes include `studio.gateway_url_missing`, `studio.gateway_token_missing`, `studio.upstream_error`, and `studio.upstream_closed`.
+
+Marketplace skill installs now use a gateway-native workspace flow and do not require enabling SSH on the user machine.
+
+### Spotify auth on localhost
+
+If you are testing the `SOUNDCLAW` jukebox locally and Spotify OAuth does not accept your `localhost` callback, use an `ngrok` callback bridge:
+
+1. Keep Claw3D running locally on `http://localhost:3000`.
+2. Start `ngrok` for the local Studio server, for example `ngrok http 3000`.
+3. In the jukebox setup UI, paste your public `ngrok` URL into the `ngrok Public URL` field.
+4. In the Spotify developer dashboard, register `https://<your-ngrok-host>/spotify/callback` as the redirect URI.
+5. Complete Spotify sign-in from the jukebox panel.
+
+How it works:
+
+- The main Claw3D app stays on `localhost`, so your normal local office state and agent state remain intact.
+- Spotify redirects to the `ngrok` callback URL.
+- The callback page passes the auth code back to the open local Claw3D window.
+
+Current local limitation:
+
+- Because only the Spotify access token is stored right now, you may need to repeat the `ngrok` auth flow when that token expires during local development.
+
+If you use other advanced gateway-host operations over SSH:
+
+- macOS: enable `System Settings` -> `General` -> `Sharing` -> `Remote Login`, and make sure the target user is allowed.
+- Windows: enable the `OpenSSH Server` optional feature, start the `sshd` service, and allow it through the firewall.
+- Linux: make sure `sshd` is installed, running, and reachable from the Studio machine.
+
+For first-time SSH connections, Claw3D uses `StrictHostKeyChecking=accept-new` by default so a new host key can be trusted automatically. If you need stricter behavior, set `OPENCLAW_GATEWAY_SSH_STRICT_HOST_KEY_CHECKING=yes`, or set it to `no` only if you explicitly want to skip host key checks.
 
 ## Contributing
 

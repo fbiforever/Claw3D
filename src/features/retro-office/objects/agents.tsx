@@ -888,36 +888,36 @@ export const AgentModel = memo(function AgentModel({
         <boxGeometry args={[0.07, 0.05, 0.07]} />
         <meshLambertMaterial color={furColor} />
       </mesh>
-      <mesh position={[0, 0.475, 0]}>
-        <boxGeometry args={[0.16, 0.16, 0.14]} />
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[0.2, 0.18, 0.17]} />
         <meshLambertMaterial color={furColor} />
       </mesh>
-      <mesh position={[-0.048, 0.61, 0.01]} rotation={[0.08, 0, 0.06]}>
-        <boxGeometry args={[0.048, 0.17, 0.05]} />
+      <mesh position={[-0.062, 0.725, 0.012]} rotation={[0.05, 0, 0.12]}>
+        <boxGeometry args={[0.062, 0.28, 0.06]} />
         <meshLambertMaterial color={furColor} />
       </mesh>
-      <mesh position={[0.048, 0.61, 0.01]} rotation={[0.08, 0, -0.06]}>
-        <boxGeometry args={[0.048, 0.17, 0.05]} />
+      <mesh position={[0.062, 0.725, 0.012]} rotation={[0.05, 0, -0.12]}>
+        <boxGeometry args={[0.062, 0.28, 0.06]} />
         <meshLambertMaterial color={furColor} />
       </mesh>
-      <mesh position={[-0.048, 0.61, 0.038]} rotation={[0.08, 0, 0.06]}>
-        <boxGeometry args={[0.024, 0.14, 0.02]} />
-        <meshLambertMaterial color={earInnerColor} />
+      <mesh position={[-0.062, 0.725, 0.043]} rotation={[0.05, 0, 0.12]}>
+        <boxGeometry args={[0.028, 0.23, 0.02]} />
+        <meshLambertMaterial color="#f472b6" />
       </mesh>
-      <mesh position={[0.048, 0.61, 0.038]} rotation={[0.08, 0, -0.06]}>
-        <boxGeometry args={[0.024, 0.14, 0.02]} />
-        <meshLambertMaterial color={earInnerColor} />
+      <mesh position={[0.062, 0.725, 0.043]} rotation={[0.05, 0, -0.12]}>
+        <boxGeometry args={[0.028, 0.23, 0.02]} />
+        <meshLambertMaterial color="#f472b6" />
       </mesh>
-      <mesh position={[0, 0.442, 0.08]}>
-        <boxGeometry args={[0.075, 0.055, 0.03]} />
+      <mesh position={[0, 0.468, 0.098]}>
+        <boxGeometry args={[0.094, 0.07, 0.03]} />
         <meshLambertMaterial color="#fff7ed" />
       </mesh>
-      <mesh position={[-0.058, 0.458, 0.079]}>
-        <boxGeometry args={[0.024, 0.024, 0.01]} />
+      <mesh position={[-0.068, 0.485, 0.095]}>
+        <boxGeometry args={[0.03, 0.03, 0.012]} />
         <meshLambertMaterial color={earInnerColor} transparent opacity={0.35} />
       </mesh>
-      <mesh position={[0.058, 0.458, 0.079]}>
-        <boxGeometry args={[0.024, 0.024, 0.01]} />
+      <mesh position={[0.068, 0.485, 0.095]}>
+        <boxGeometry args={[0.03, 0.03, 0.012]} />
         <meshLambertMaterial color={earInnerColor} transparent opacity={0.35} />
       </mesh>
       <mesh ref={leftBrowRef} position={[-0.04, BUNNY_BROW_BASE_Y, BUNNY_BROW_BASE_Z]}>
@@ -944,7 +944,7 @@ export const AgentModel = memo(function AgentModel({
         <boxGeometry args={[0.008, 0.008, 0.01]} />
         <meshBasicMaterial color="#fff" />
       </mesh>
-      <mesh position={[0, 0.476, 0.104]}>
+      <mesh position={[0, 0.49, 0.115]}>
         <boxGeometry args={[0.022, 0.018, 0.012]} />
         <meshBasicMaterial color={noseColor} />
       </mesh>
@@ -968,8 +968,8 @@ export const AgentModel = memo(function AgentModel({
         <boxGeometry args={[0.014, 0.014, 0.01]} />
         <meshBasicMaterial color="#9c4a4a" />
       </mesh>
-      <mesh position={[0, 0.315, -0.065]}>
-        <sphereGeometry args={[0.034, 12, 12]} />
+      <mesh position={[0, 0.315, -0.075]}>
+        <sphereGeometry args={[0.042, 12, 12]} />
         <meshLambertMaterial color={furColor} />
       </mesh>
       <mesh

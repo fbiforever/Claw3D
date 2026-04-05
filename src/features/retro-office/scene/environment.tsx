@@ -555,6 +555,248 @@ function CityTrafficLayer({
   );
 }
 
+function FactoryBlock({
+  position,
+  width,
+  depth,
+  height,
+  bodyColor,
+  roofColor,
+  chimneyColor,
+}: {
+  position: [number, number, number];
+  width: number;
+  depth: number;
+  height: number;
+  bodyColor: string;
+  roofColor: string;
+  chimneyColor: string;
+}) {
+  return (
+    <group position={position}>
+      <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[width, height, depth]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.86} metalness={0.08} />
+      </mesh>
+      <mesh position={[0, height + 0.03, 0]} castShadow>
+        <boxGeometry args={[width * 0.92, 0.06, depth * 0.92]} />
+        <meshStandardMaterial color={roofColor} roughness={0.78} metalness={0.12} />
+      </mesh>
+      {[-width * 0.22, 0, width * 0.22].map((offsetX, index) => (
+        <mesh key={`factory-chimney-${index}`} position={[offsetX, height + 0.18, -depth * 0.18]} castShadow>
+          <cylinderGeometry args={[0.06, 0.07, 0.34 + index * 0.07, 10]} />
+          <meshStandardMaterial color={chimneyColor} roughness={0.72} metalness={0.18} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function RoadTile({
+  position,
+  size,
+  mask,
+}: {
+  position: [number, number, number];
+  size: number;
+  mask: RoadMask;
+}) {
+  const roadWidth = size * 0.72;
+  const laneWidth = size * 0.06;
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[size, size]} />
+        <meshStandardMaterial color="#5c8f47" roughness={0.98} metalness={0.01} />
+      </mesh>
+      <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[roadWidth, roadWidth]} />
+        <meshStandardMaterial color="#3f4650" roughness={0.95} metalness={0.08} />
+      </mesh>
+      {mask.north || mask.south ? (
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[laneWidth, size * 0.88]} />
+          <meshBasicMaterial color="#f8fafc" transparent opacity={0.95} />
+        </mesh>
+      ) : null}
+      {mask.east || mask.west ? (
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+          <planeGeometry args={[laneWidth, size * 0.88]} />
+          <meshBasicMaterial color="#f8fafc" transparent opacity={0.95} />
+        </mesh>
+      ) : null}
+      {mask.north ? (
+        <mesh position={[0, 0.0045, -size * 0.36]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[roadWidth, size * 0.3]} />
+          <meshStandardMaterial color="#3f4650" roughness={0.95} metalness={0.08} />
+        </mesh>
+      ) : null}
+      {mask.south ? (
+        <mesh position={[0, 0.0045, size * 0.36]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[roadWidth, size * 0.3]} />
+          <meshStandardMaterial color="#3f4650" roughness={0.95} metalness={0.08} />
+        </mesh>
+      ) : null}
+      {mask.west ? (
+        <mesh position={[-size * 0.36, 0.0045, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+          <planeGeometry args={[roadWidth, size * 0.3]} />
+          <meshStandardMaterial color="#3f4650" roughness={0.95} metalness={0.08} />
+        </mesh>
+      ) : null}
+      {mask.east ? (
+        <mesh position={[size * 0.36, 0.0045, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+          <planeGeometry args={[roadWidth, size * 0.3]} />
+          <meshStandardMaterial color="#3f4650" roughness={0.95} metalness={0.08} />
+        </mesh>
+      ) : null}
+    </group>
+  );
+}
+
+function FullCityScene({ centerX, centerZ }: { centerX: number; centerZ: number }) {
+  const cityGrid = useMemo(() => buildCityGrid(), []);
+  const baseOffsetX = centerX - ((CITY_GRID_COLUMNS - 1) * CITY_GRID_CELL_SIZE) / 2;
+  const baseOffsetZ = centerZ - ((CITY_GRID_ROWS - 1) * CITY_GRID_CELL_SIZE) / 2;
+  const cityWidth = CITY_GRID_COLUMNS * CITY_GRID_CELL_SIZE;
+  const cityDepth = CITY_GRID_ROWS * CITY_GRID_CELL_SIZE;
+  const hqPosition: [number, number, number] = [centerX, 0, centerZ + CITY_GRID_CELL_SIZE * 0.5];
+  const trafficNorthZ = baseOffsetZ + 2 * CITY_GRID_CELL_SIZE;
+  const trafficSouthZ = baseOffsetZ + 5 * CITY_GRID_CELL_SIZE;
+  const trafficWestX = baseOffsetX + 2 * CITY_GRID_CELL_SIZE;
+  const trafficEastX = baseOffsetX + 7 * CITY_GRID_CELL_SIZE;
+  return (
+    <group>
+      <mesh position={[centerX, -0.02, centerZ]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[cityWidth + 3.2, cityDepth + 3.2]} />
+        <meshStandardMaterial color="#66a04a" roughness={0.99} metalness={0.01} />
+      </mesh>
+      {cityGrid.map((cell) => {
+        const x = baseOffsetX + cell.gx * CITY_GRID_CELL_SIZE;
+        const z = baseOffsetZ + cell.gz * CITY_GRID_CELL_SIZE;
+        if (cell.road) {
+          return (
+            <RoadTile
+              key={`full-city-road-${cell.gx}-${cell.gz}`}
+              position={[x, 0, z]}
+              size={CITY_GRID_CELL_SIZE}
+              mask={cell.mask}
+            />
+          );
+        }
+        const lotPosition: [number, number, number] = [x, 0, z];
+        if ((cell.gx + cell.gz) % 7 === 0) {
+          return (
+            <group key={`full-city-park-${cell.gx}-${cell.gz}`} position={lotPosition}>
+              <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+                <planeGeometry args={[CITY_GRID_CELL_SIZE * 0.9, CITY_GRID_CELL_SIZE * 0.9]} />
+                <meshStandardMaterial color="#5d994a" roughness={0.98} metalness={0.01} />
+              </mesh>
+              <StreetTree position={[-0.24, 0, -0.18]} canopyColor="#3f9142" />
+              <StreetTree position={[0.18, 0, 0.12]} canopyColor="#4ea34a" />
+            </group>
+          );
+        }
+        if (cell.zone === "residential") {
+          return (
+            <TownhouseBlock
+              key={`full-city-res-${cell.gx}-${cell.gz}`}
+              position={lotPosition}
+              rotationY={(cell.gx + cell.gz) % 2 === 0 ? 0 : Math.PI / 2}
+              width={0.72}
+              depth={0.72}
+              height={0.78 + ((cell.gx + cell.gz) % 3) * 0.12}
+              bodyColor={["#d8c3a5", "#cbb6d9", "#c6d8ef", "#c4d7b2"][(cell.gx + cell.gz) % 4] ?? "#d8c3a5"}
+              roofColor={["#8d6e63", "#6b4f85", "#4b5d73", "#5f7a61"][(cell.gx + cell.gz) % 4] ?? "#8d6e63"}
+              doorColor="#473225"
+              windowColor="#f8f3c2"
+            />
+          );
+        }
+        if (cell.zone === "commercial") {
+          const isTower = cell.gz <= 1 && cell.gx % 3 === 0;
+          return isTower ? (
+            <TowerBlock
+              key={`full-city-com-tower-${cell.gx}-${cell.gz}`}
+              position={lotPosition}
+              width={0.84}
+              depth={0.84}
+              height={2.5 + (cell.gx % 2) * 0.9}
+              bodyColor="#e5e7eb"
+              accentColor="#9ca3af"
+              windowColor="#111827"
+            />
+          ) : (
+            <StorefrontBlock
+              key={`full-city-com-store-${cell.gx}-${cell.gz}`}
+              position={lotPosition}
+              rotationY={cell.gz % 2 === 0 ? 0 : Math.PI / 2}
+              width={0.86}
+              depth={0.74}
+              height={0.9 + (cell.gx % 3) * 0.12}
+              bodyColor={["#facc15", "#d6b48a", "#f3f4f6", "#f59e0b"][(cell.gx + cell.gz) % 4] ?? "#d6b48a"}
+              awningColor={["#ef4444", "#2563eb", "#22c55e", "#8b5cf6"][(cell.gx + cell.gz) % 4] ?? "#ef4444"}
+              trimColor="#f8fafc"
+              windowColor="#dbeafe"
+            />
+          );
+        }
+        return (
+          <FactoryBlock
+            key={`full-city-ind-${cell.gx}-${cell.gz}`}
+            position={lotPosition}
+            width={0.92}
+            depth={0.84}
+            height={0.72 + (cell.gx % 2) * 0.14}
+            bodyColor="#8b5e3c"
+            roofColor="#3f3f46"
+            chimneyColor="#9ca3af"
+          />
+        );
+      })}
+      <group position={hqPosition}>
+        <TowerBlock
+          position={[-0.52, 0, -0.26]}
+          width={0.9}
+          depth={0.9}
+          height={3.6}
+          bodyColor="#f3f4f6"
+          accentColor="#9ca3af"
+          windowColor="#0f172a"
+        />
+        <TowerBlock
+          position={[0.56, 0, 0.24]}
+          width={0.9}
+          depth={0.9}
+          height={3.1}
+          bodyColor="#f3f4f6"
+          accentColor="#9ca3af"
+          windowColor="#0f172a"
+        />
+        <StorefrontBlock
+          position={[0, 0, 0.92]}
+          width={1.3}
+          depth={0.78}
+          height={0.95}
+          bodyColor="#334155"
+          awningColor="#22c55e"
+          trimColor="#dcfce7"
+          windowColor="#bfdbfe"
+        />
+      </group>
+      <CityTrafficLayer
+        cityRoadSpanX={CITY_GRID_CELL_SIZE * CITY_GRID_COLUMNS * 0.82}
+        cityRoadSpanZ={CITY_GRID_CELL_SIZE * CITY_GRID_ROWS * 0.82}
+        localOfficeCenterX={centerX}
+        localOfficeCenterZ={centerZ}
+        northRoadZ={trafficNorthZ}
+        southRoadZ={trafficSouthZ}
+        westRoadX={trafficWestX}
+        eastRoadX={trafficEastX}
+      />
+    </group>
+  );
+}
+
 type ZoneKind = "residential" | "commercial" | "industrial";
 type RoadMask = {
   north: boolean;
@@ -675,6 +917,10 @@ export const FloorAndWalls = memo(function FloorAndWalls({
   const groundCenterZ = showRemoteOffice ? districtCenterZ : localOfficeCenterZ;
   const groundWidth = showRemoteOffice ? districtWidth : localOfficeWidth;
   const groundHeight = showRemoteOffice ? districtHeight : localOfficeHeight;
+
+  if (showRemoteOffice) {
+    return <FullCityScene centerX={localOfficeCenterX} centerZ={localOfficeCenterZ} />;
+  }
 
   return (
     <group>
@@ -1433,6 +1679,7 @@ export const WallPictures = memo(function WallPictures({
 }: {
   showRemoteOffice?: boolean;
 }) {
+  if (showRemoteOffice) return null;
   const localWidth = LOCAL_OFFICE_CANVAS_WIDTH * SCALE;
   const localHeight = LOCAL_OFFICE_CANVAS_HEIGHT * SCALE;
   const [localCenterX, , localCenterZ] = toWorld(

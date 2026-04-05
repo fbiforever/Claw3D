@@ -3229,6 +3229,7 @@ export function RetroOffice3D({
     0,
     agents.length - compactRosterAgents.length,
   );
+  const sceneTitle = cityScapeMode ? "OpenClaw City" : officeTitle;
   const districtNeedEmojiByAgentId = useMemo(
     () =>
       districtSimulation.agents.reduce<Record<string, string>>((acc, agent) => {
@@ -5471,24 +5472,25 @@ export function RetroOffice3D({
             </Suspense>
 
             {/* Furniture models — each loads its GLB asynchronously. */}
-            <Suspense fallback={null}>
-              {!editMode ? (
-                <PrimitiveInstancedWallSegmentsModel items={wallItems} />
-              ) : null}
-              {!editMode ? (
-                <InstancedFurnitureItemsModel
-                  itemType="desk_cubicle"
-                  items={deskItems}
-                  onItemClick={handleDeskClick}
-                />
-              ) : null}
-              {!editMode ? (
-                <InstancedFurnitureItemsModel
-                  itemType="chair"
-                  items={chairItems}
-                />
-              ) : null}
-              {furniture.map((item) =>
+            {!cityScapeMode ? (
+              <Suspense fallback={null}>
+                {!editMode ? (
+                  <PrimitiveInstancedWallSegmentsModel items={wallItems} />
+                ) : null}
+                {!editMode ? (
+                  <InstancedFurnitureItemsModel
+                    itemType="desk_cubicle"
+                    items={deskItems}
+                    onItemClick={handleDeskClick}
+                  />
+                ) : null}
+                {!editMode ? (
+                  <InstancedFurnitureItemsModel
+                    itemType="chair"
+                    items={chairItems}
+                  />
+                ) : null}
+                {furniture.map((item) =>
                 item.type === "wall" ? (
                   editMode ? (
                     <PrimitiveWallSegmentModel
@@ -5893,66 +5895,69 @@ export function RetroOffice3D({
                     onClick={handleDeskClick}
                   />
                 ),
-              )}
-            </Suspense>
+                )}
+              </Suspense>
+            ) : null}
 
-            {remoteLayoutFurniture.length > 0 ? (
+            {!cityScapeMode && remoteLayoutFurniture.length > 0 ? (
               <ReadOnlyFurnitureClone furniture={remoteLayoutFurniture} />
             ) : null}
 
             {/* Removed standalone Jukebox as it's now in the furniture loop */}
 
             {/* Agents — purely imperative, driven by renderAgentsRef inside useFrame. */}
-            {sceneAgents.map((agent) => {
-              const isJanitor = "role" in agent && agent.role === "janitor";
-              return (
-                <AgentObjectModel
-                  key={agent.id}
-                  agentId={agent.id}
-                  name={agent.name}
-                  subtitle={"subtitle" in agent ? agent.subtitle ?? null : null}
-                  status={agent.status}
-                  color={agentColorMap.get(agent.id) ?? "#888"}
-                  appearance={
-                    "avatarProfile" in agent
-                      ? (agent.avatarProfile ?? null)
-                      : null
-                  }
-                  agentsRef={renderAgentsRef}
-                  agentLookupRef={renderAgentLookupRef}
-                  onHover={isJanitor ? undefined : handleAgentHover}
-                  onUnhover={isJanitor ? undefined : handleAgentUnhover}
-                  onClick={isJanitor ? undefined : handleAgentClick}
-                  onContextMenu={isJanitor ? undefined : handleAgentContextMenu}
-                  showSpeech={
-                    isJanitor
-                      ? false
-                      : standupMeeting?.phase === "in_progress"
-                        ? Boolean(standupSpeechTextByAgentId[agent.id])
-                        : speechAgentIds.has(agent.id) ||
-                          Boolean(streamingTextByAgentId[agent.id])
-                  }
-                  speechText={
-                    isJanitor
-                      ? null
-                      : standupMeeting?.phase === "in_progress"
-                        ? (standupSpeechTextByAgentId[agent.id] ?? null)
-                        : (speechTextByAgentId[agent.id] ??
-                            streamingTextByAgentId[agent.id] ??
-                            null)
-                  }
-                  suppressSpeechBubble={
-                    suppressSceneSpeechBubbles &&
-                    standupMeeting?.currentSpeakerAgentId !== agent.id
-                  }
-                />
-              );
-            })}
+            {!cityScapeMode
+              ? sceneAgents.map((agent) => {
+                  const isJanitor = "role" in agent && agent.role === "janitor";
+                  return (
+                    <AgentObjectModel
+                      key={agent.id}
+                      agentId={agent.id}
+                      name={agent.name}
+                      subtitle={"subtitle" in agent ? agent.subtitle ?? null : null}
+                      status={agent.status}
+                      color={agentColorMap.get(agent.id) ?? "#888"}
+                      appearance={
+                        "avatarProfile" in agent
+                          ? (agent.avatarProfile ?? null)
+                          : null
+                      }
+                      agentsRef={renderAgentsRef}
+                      agentLookupRef={renderAgentLookupRef}
+                      onHover={isJanitor ? undefined : handleAgentHover}
+                      onUnhover={isJanitor ? undefined : handleAgentUnhover}
+                      onClick={isJanitor ? undefined : handleAgentClick}
+                      onContextMenu={isJanitor ? undefined : handleAgentContextMenu}
+                      showSpeech={
+                        isJanitor
+                          ? false
+                          : standupMeeting?.phase === "in_progress"
+                            ? Boolean(standupSpeechTextByAgentId[agent.id])
+                            : speechAgentIds.has(agent.id) ||
+                              Boolean(streamingTextByAgentId[agent.id])
+                      }
+                      speechText={
+                        isJanitor
+                          ? null
+                          : standupMeeting?.phase === "in_progress"
+                            ? (standupSpeechTextByAgentId[agent.id] ?? null)
+                            : (speechTextByAgentId[agent.id] ??
+                                streamingTextByAgentId[agent.id] ??
+                                null)
+                      }
+                      suppressSpeechBubble={
+                        suppressSceneSpeechBubbles &&
+                        standupMeeting?.currentSpeakerAgentId !== agent.id
+                      }
+                    />
+                  );
+                })
+              : null}
 
-            <ScenePingPongBall agentsRef={renderAgentsRef} />
+            {!cityScapeMode ? <ScenePingPongBall agentsRef={renderAgentsRef} /> : null}
 
             {/* New Idea 5: Agent color trails while walking. */}
-            {trailMode ? (
+            {!cityScapeMode && trailMode ? (
               <AgentTrailSystem
                 agentsRef={renderAgentsRef}
                 colorMap={agentColorMap}
@@ -5960,7 +5965,7 @@ export function RetroOffice3D({
             ) : null}
 
             {/* New Idea 7: Heatmap overlay when heatmap mode is active. */}
-            {heatmapMode ? (
+            {!cityScapeMode && heatmapMode ? (
               <AgentHeatmapSystem
                 agentsRef={renderAgentsRef}
                 heatmapMode={heatmapMode}
@@ -6103,7 +6108,7 @@ export function RetroOffice3D({
           <div className="flex items-center gap-3">
             <div className="h-px w-12 bg-gradient-to-r from-transparent to-amber-500/40" />
             <span className="text-sm tracking-[0.3em] text-amber-300/80 font-bold uppercase">
-              {officeTitle}
+              {sceneTitle}
             </span>
             <div className="h-px w-12 bg-gradient-to-l from-transparent to-amber-500/40" />
           </div>
@@ -6111,7 +6116,7 @@ export function RetroOffice3D({
       ) : null}
 
       {/* Agent roster — compact top summary with overflow panel. */}
-      {!readOnly && !immersiveOverlayActive ? (
+      {!cityScapeMode && !readOnly && !immersiveOverlayActive ? (
         <div className="absolute top-10 left-1/2 z-20 -translate-x-1/2">
           <div className="flex items-center gap-2 rounded-full border border-amber-900/25 bg-[#1c1610]/92 px-2 py-2 shadow-lg backdrop-blur-sm">
             <div className="flex items-center -space-x-1.5">

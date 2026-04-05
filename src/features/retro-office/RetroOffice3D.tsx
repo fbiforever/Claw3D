@@ -148,6 +148,15 @@ import {
   markServerRoomMigrationApplied,
   saveFurniture,
 } from "@/features/retro-office/core/persistence";
+import {
+  createDistrictSimulationState,
+  DISTRICT_SIM_DEFAULT_DISTRICT_COUNT,
+  DISTRICT_SIM_DEFAULT_MAX_AGENTS,
+  getDistrictSimulationNeedEmoji,
+  reconcileDistrictSimulationAgents,
+  stepDistrictSimulation,
+  type DistrictSimulationState,
+} from "@/features/retro-office/core/districtSimulation";
 import type {
   FurnitureItem,
   JanitorActor,
@@ -2290,6 +2299,8 @@ function useAgentTick(
 
 const AWAY_THRESHOLD_MS = 15 * 60 * 1000;
 const COMPACT_AGENT_BADGE_LIMIT = 6;
+const DISTRICT_SIM_STEP_MINUTES = 10;
+const DISTRICT_SIM_STEP_INTERVAL_MS = 10_000;
 
 const estimatePhoneSpeechDurationMs = (
   text: string | null | undefined,
@@ -2308,6 +2319,18 @@ const getAgentInitials = (name: string | null | undefined): string => {
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 };
+
+const formatDistrictSimTime = (minuteOfDay: number): string => {
+  const normalizedMinutes = ((minuteOfDay % 1440) + 1440) % 1440;
+  const hour = Math.floor(normalizedMinutes / 60)
+    .toString()
+    .padStart(2, "0");
+  const minute = (normalizedMinutes % 60).toString().padStart(2, "0");
+  return `${hour}:${minute}`;
+};
+
+const formatDistrictCurrency = (value: number): string =>
+  `$${Math.round(value).toLocaleString("en-US")}`;
 
 export function RetroOffice3D({
   agents,
@@ -2792,6 +2815,42 @@ export function RetroOffice3D({
   );
   const [githubImmersiveReady, setGithubImmersiveReady] = useState(false);
   const [qaImmersiveReady, setQaImmersiveReady] = useState(false);
+  const [districtSimulation, setDistrictSimulation] =
+    useState<DistrictSimulationState>(() =>
+      createDistrictSimulationState({
+        agents: agents
+          .filter((agent) => !isRemoteOfficeAgentId(agent.id))
+          .map((agent) => ({ id: agent.id, name: agent.name })),
+        districtCount: DISTRICT_SIM_DEFAULT_DISTRICT_COUNT,
+        maxAgents: DISTRICT_SIM_DEFAULT_MAX_AGENTS,
+        seedKey: storageNamespace,
+      }),
+    );
+
+  useEffect(() => {
+    const simulationAgents = agents
+      .filter((agent) => !isRemoteOfficeAgentId(agent.id))
+      .map((agent) => ({ id: agent.id, name: agent.name }));
+    setDistrictSimulation((previous) =>
+      reconcileDistrictSimulationAgents(previous, {
+        agents: simulationAgents,
+        districtCount: DISTRICT_SIM_DEFAULT_DISTRICT_COUNT,
+        maxAgents: DISTRICT_SIM_DEFAULT_MAX_AGENTS,
+        seedKey: storageNamespace,
+      }),
+    );
+  }, [agents, storageNamespace]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setDistrictSimulation((previous) =>
+        stepDistrictSimulation(previous, { minutes: DISTRICT_SIM_STEP_MINUTES }),
+      );
+    }, DISTRICT_SIM_STEP_INTERVAL_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     markAtmMigrationApplied(storageNamespace);
@@ -3169,6 +3228,70 @@ export function RetroOffice3D({
     0,
     agents.length - compactRosterAgents.length,
   );
+  const districtNeedEmojiByAgentId = useMemo(
+    () =>
+      districtSimulation.agents.reduce<Record<string, string>>((acc, agent) => {
+        const emoji = getDistrictSimulationNeedEmoji(agent.needs);
+        if (emoji) acc[agent.id] = emoji;
+        return acc;
+      }, {}),
+    [districtSimulation.agents],
+  );
+  const districtSimulationSummary = useMemo(() => {
+    const districts = Array.from(
+      { length: districtSimulation.districtCount },
+      (_, index) => ({
+        id: index,
+        population: 0,
+        working: 0,
+        socializing: 0,
+      }),
+    );
+    let totalWallet = 0;
+    let totalRooms = 0;
+    for (const agent of districtSimulation.agents) {
+      const district = districts[agent.districtId] ?? districts[0];
+      if (district) {
+        district.population += 1;
+        if (agent.activity === "work") district.working += 1;
+        if (agent.activity === "socialize") district.socializing += 1;
+      }
+      totalWallet += agent.wallet;
+      totalRooms += agent.roomsOwned;
+    }
+    const relationshipValues = Object.values(districtSimulation.relationships);
+    const averageRelationship =
+      relationshipValues.length === 0
+        ? 0
+        : relationshipValues.reduce((sum, value) => sum + value, 0) /
+          relationshipValues.length;
+    const criticalNeeds = districtSimulation.agents
+      .map((agent) => {
+        const lowestNeed = Math.min(
+          agent.needs.hunger,
+          agent.needs.energy,
+          agent.needs.social,
+          agent.needs.comfort,
+        );
+        return {
+          id: agent.id,
+          name: agent.name,
+          lowestNeed,
+          emoji: getDistrictSimulationNeedEmoji(agent.needs),
+        };
+      })
+      .filter((entry) => Boolean(entry.emoji))
+      .sort((left, right) => left.lowestNeed - right.lowestNeed)
+      .slice(0, 4);
+    return {
+      districts,
+      totalWallet,
+      totalRooms,
+      averageRelationship,
+      criticalNeeds,
+      simulatedAgents: districtSimulation.agents.length,
+    };
+  }, [districtSimulation]);
   const standupActive =
     standupMeeting?.phase === "gathering" ||
     standupMeeting?.phase === "in_progress";
@@ -5997,6 +6120,7 @@ export function RetroOffice3D({
                 const working = status?.working ?? agent.status === "working";
                 const isRemoteAgent = isRemoteOfficeAgentId(agent.id);
                 const mood = moodByAgentId[agent.id];
+                const simNeedEmoji = districtNeedEmojiByAgentId[agent.id];
                 const dotClass = isError
                   ? "bg-red-400"
                   : working
@@ -6032,6 +6156,10 @@ export function RetroOffice3D({
                         }}
                       >
                         {mood.emoji}
+                      </span>
+                    ) : simNeedEmoji ? (
+                      <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-sm pointer-events-none">
+                        {simNeedEmoji}
                       </span>
                     ) : null}
                     <span>{getAgentInitials(agent.name)}</span>
@@ -6199,6 +6327,114 @@ export function RetroOffice3D({
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {!immersiveOverlayActive ? (
+        <aside className="absolute top-3 right-3 z-20 w-[min(92vw,320px)] rounded-2xl border border-cyan-900/25 bg-[#10171f]/94 p-3 shadow-xl backdrop-blur-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/70">
+                City simulation
+              </div>
+              <div className="mt-1 text-sm font-semibold text-cyan-100">
+                Day {districtSimulation.day} ·{" "}
+                {formatDistrictSimTime(districtSimulation.minuteOfDay)}
+              </div>
+            </div>
+            <span className="rounded-full border border-cyan-700/30 bg-cyan-800/20 px-2 py-1 font-mono text-[10px] text-cyan-200/80">
+              Scope A
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-lg border border-cyan-900/25 bg-black/20 px-2 py-1.5">
+              <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/65">
+                Agents
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {districtSimulationSummary.simulatedAgents}
+              </div>
+            </div>
+            <div className="rounded-lg border border-cyan-900/25 bg-black/20 px-2 py-1.5">
+              <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/65">
+                Districts
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {districtSimulation.districtCount}
+              </div>
+            </div>
+            <div className="rounded-lg border border-cyan-900/25 bg-black/20 px-2 py-1.5">
+              <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/65">
+                Housing
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {districtSimulationSummary.totalRooms} rooms
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-cyan-900/25 bg-black/20 px-2 py-1.5">
+              <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/65">
+                Economy
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {formatDistrictCurrency(districtSimulationSummary.totalWallet)}
+              </div>
+            </div>
+            <div className="rounded-lg border border-cyan-900/25 bg-black/20 px-2 py-1.5">
+              <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/65">
+                Relations
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {districtSimulationSummary.averageRelationship.toFixed(1)}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/70">
+              District population
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {districtSimulationSummary.districts.map((district) => (
+                <div
+                  key={`district-${district.id}`}
+                  className="rounded-md border border-cyan-900/20 bg-black/15 px-2 py-1"
+                >
+                  <div className="flex items-center justify-between text-[10px] text-cyan-100">
+                    <span>D{district.id + 1}</span>
+                    <span>{district.population}</span>
+                  </div>
+                  <div className="font-mono text-[9px] text-cyan-400/70">
+                    W:{district.working} · S:{district.socializing}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {districtSimulationSummary.criticalNeeds.length > 0 ? (
+            <div className="mt-3">
+              <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-400/70">
+                Needs alerts
+              </div>
+              <div className="space-y-1">
+                {districtSimulationSummary.criticalNeeds.map((entry) => (
+                  <div
+                    key={`need-${entry.id}`}
+                    className="flex items-center justify-between rounded-md border border-cyan-900/20 bg-black/15 px-2 py-1 text-[10px]"
+                  >
+                    <span className="truncate text-cyan-100">{entry.name}</span>
+                    <span className="text-cyan-200">
+                      {entry.emoji} {entry.lowestNeed.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </aside>
       ) : null}
 
       {/* Idea 1: Agent tooltip — shown when hovering an agent in the 3D scene. */}

@@ -2709,8 +2709,9 @@ export function RetroOffice3D({
       toWorld(LOCAL_OFFICE_CANVAS_WIDTH / 2, LOCAL_OFFICE_CANVAS_HEIGHT / 2),
     [],
   );
+  const cityScapeMode = true;
   const CAM_POS = useMemo<[number, number, number]>(() => {
-    if (remoteOfficeEnabled) return DISTRICT_CAMERA_POSITION;
+    if (cityScapeMode) return DISTRICT_CAMERA_POSITION;
     return [
       LOCAL_CAMERA_TARGET[0] +
         (DISTRICT_CAMERA_POSITION[0] - DISTRICT_CAMERA_TARGET[0]),
@@ -2719,11 +2720,11 @@ export function RetroOffice3D({
       LOCAL_CAMERA_TARGET[2] +
         (DISTRICT_CAMERA_POSITION[2] - DISTRICT_CAMERA_TARGET[2]),
     ];
-  }, [LOCAL_CAMERA_TARGET, remoteOfficeEnabled]);
-  const cameraTarget = remoteOfficeEnabled
+  }, [LOCAL_CAMERA_TARGET, cityScapeMode]);
+  const cameraTarget = cityScapeMode
     ? DISTRICT_CAMERA_TARGET
     : LOCAL_CAMERA_TARGET;
-  const cameraZoom = remoteOfficeEnabled ? DISTRICT_CAMERA_ZOOM : 56;
+  const cameraZoom = cityScapeMode ? DISTRICT_CAMERA_ZOOM : 56;
   const overviewPreset = useMemo(
     () => ({ pos: CAM_POS, target: cameraTarget, zoom: cameraZoom }),
     [CAM_POS, cameraTarget, cameraZoom]
@@ -2731,12 +2732,12 @@ export function RetroOffice3D({
   const canvasResetKey = useMemo(
     () =>
       [
-        remoteOfficeEnabled ? "remote" : "local",
+        cityScapeMode ? "remote" : "local",
         gatewayStatus ?? "unknown",
         String(agents.length),
         String(officeCenterSignal),
       ].join(":"),
-    [agents.length, gatewayStatus, officeCenterSignal, remoteOfficeEnabled],
+    [agents.length, cityScapeMode, gatewayStatus, officeCenterSignal],
   );
   // New Idea 7: heatmap mode.
   const [heatmapMode, setHeatmapMode] = useState(false);
@@ -5459,10 +5460,10 @@ export function RetroOffice3D({
             />
 
             {/* Floor + walls — always visible, no async loading. */}
-            <SceneFloorAndWalls showRemoteOffice={remoteOfficeEnabled} />
+            <SceneFloorAndWalls showRemoteOffice={cityScapeMode} />
 
             {/* Wall pictures — procedural, no async loading. */}
-            <SceneWallPictures showRemoteOffice={remoteOfficeEnabled} />
+            <SceneWallPictures showRemoteOffice={cityScapeMode} />
 
             {/* Environment lighting — async, wrapped in its own Suspense so floor stays visible. */}
             <Suspense fallback={null}>

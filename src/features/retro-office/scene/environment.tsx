@@ -335,6 +335,77 @@ function TownhouseBlock({
   );
 }
 
+function StreetTree({
+  position,
+  canopyColor = "#3f9142",
+}: {
+  position: [number, number, number];
+  canopyColor?: string;
+}) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.22, 0]} castShadow>
+        <cylinderGeometry args={[0.045, 0.055, 0.44, 10]} />
+        <meshStandardMaterial color="#6d4c41" roughness={0.82} metalness={0.08} />
+      </mesh>
+      <mesh position={[0, 0.6, 0]} castShadow>
+        <sphereGeometry args={[0.18, 12, 12]} />
+        <meshStandardMaterial color={canopyColor} roughness={0.9} metalness={0.02} />
+      </mesh>
+      <mesh position={[0.11, 0.54, 0.05]} castShadow>
+        <sphereGeometry args={[0.12, 10, 10]} />
+        <meshStandardMaterial color={canopyColor} roughness={0.9} metalness={0.02} />
+      </mesh>
+      <mesh position={[-0.1, 0.55, -0.06]} castShadow>
+        <sphereGeometry args={[0.11, 10, 10]} />
+        <meshStandardMaterial color={canopyColor} roughness={0.9} metalness={0.02} />
+      </mesh>
+    </group>
+  );
+}
+
+function CompactCar({
+  position,
+  rotationY = 0,
+  bodyColor,
+}: {
+  position: [number, number, number];
+  rotationY?: number;
+  bodyColor: string;
+}) {
+  return (
+    <group position={position} rotation={[0, rotationY, 0]}>
+      <mesh position={[0, 0.12, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.4, 0.14, 0.22]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.52} metalness={0.28} />
+      </mesh>
+      <mesh position={[0.02, 0.2, 0]} castShadow>
+        <boxGeometry args={[0.24, 0.11, 0.2]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.48} metalness={0.34} />
+      </mesh>
+      <mesh position={[0.07, 0.21, 0.112]}>
+        <planeGeometry args={[0.12, 0.07]} />
+        <meshBasicMaterial color="#c8e6ff" />
+      </mesh>
+      <mesh position={[0.07, 0.21, -0.112]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[0.12, 0.07]} />
+        <meshBasicMaterial color="#c8e6ff" />
+      </mesh>
+      {[
+        [-0.14, 0.05, 0.11],
+        [0.14, 0.05, 0.11],
+        [-0.14, 0.05, -0.11],
+        [0.14, 0.05, -0.11],
+      ].map(([x, y, z], index) => (
+        <mesh key={`car-wheel-${index}`} position={[x, y, z]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.04, 0.04, 0.03, 10]} />
+          <meshStandardMaterial color="#121212" roughness={0.86} metalness={0.08} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export const FloorAndWalls = memo(function FloorAndWalls({
   showRemoteOffice = true,
 }: {
@@ -379,6 +450,16 @@ export const FloorAndWalls = memo(function FloorAndWalls({
   const localSouthWallZ = localOfficeCenterZ + localOfficeHeight / 2;
   const localWestWallX = localOfficeCenterX - localOfficeWidth / 2;
   const localEastWallX = localOfficeCenterX + localOfficeWidth / 2;
+  const cityRoadOffset = 1.04;
+  const cityRoadWidth = 0.8;
+  const cityRoadSpanX = localOfficeWidth + 4.6;
+  const cityRoadSpanZ = localOfficeHeight + 4.6;
+  const northRoadZ = localNorthWallZ - cityRoadOffset;
+  const southRoadZ = localSouthWallZ + cityRoadOffset;
+  const westRoadX = localWestWallX - cityRoadOffset;
+  const eastRoadX = localEastWallX + cityRoadOffset;
+  const parkDepth = 1.95;
+  const parkWidth = 2.2;
   const groundCenterX = showRemoteOffice ? districtCenterX : localOfficeCenterX;
   const groundCenterZ = showRemoteOffice ? districtCenterZ : localOfficeCenterZ;
   const groundWidth = showRemoteOffice ? districtWidth : localOfficeWidth;
@@ -712,6 +793,108 @@ export const FloorAndWalls = memo(function FloorAndWalls({
           />
         );
       })}
+
+      <mesh position={[localOfficeCenterX, 0.003, northRoadZ]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[cityRoadSpanX, cityRoadWidth]} />
+        <meshStandardMaterial color="#4b5563" roughness={0.95} metalness={0.06} />
+      </mesh>
+      <mesh position={[localOfficeCenterX, 0.003, southRoadZ]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[cityRoadSpanX, cityRoadWidth]} />
+        <meshStandardMaterial color="#4b5563" roughness={0.95} metalness={0.06} />
+      </mesh>
+      <mesh position={[westRoadX, 0.003, localOfficeCenterZ]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[cityRoadWidth, cityRoadSpanZ]} />
+        <meshStandardMaterial color="#4b5563" roughness={0.95} metalness={0.06} />
+      </mesh>
+      <mesh position={[eastRoadX, 0.003, localOfficeCenterZ]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[cityRoadWidth, cityRoadSpanZ]} />
+        <meshStandardMaterial color="#4b5563" roughness={0.95} metalness={0.06} />
+      </mesh>
+
+      {Array.from({ length: 12 }).map((_, index) => {
+        const x = localOfficeCenterX - cityRoadSpanX / 2 + 0.55 + index * 0.78;
+        return (
+          <group key={`north-lane-dashes-${index}`}>
+            <mesh position={[x, 0.008, northRoadZ]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[0.34, 0.045]} />
+              <meshBasicMaterial color="#f8fafc" transparent opacity={0.85} />
+            </mesh>
+            <mesh position={[x, 0.008, southRoadZ]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[0.34, 0.045]} />
+              <meshBasicMaterial color="#f8fafc" transparent opacity={0.85} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {Array.from({ length: 10 }).map((_, index) => {
+        const z = localOfficeCenterZ - cityRoadSpanZ / 2 + 0.58 + index * 0.84;
+        return (
+          <group key={`side-lane-dashes-${index}`}>
+            <mesh position={[westRoadX, 0.008, z]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+              <planeGeometry args={[0.34, 0.045]} />
+              <meshBasicMaterial color="#f8fafc" transparent opacity={0.85} />
+            </mesh>
+            <mesh position={[eastRoadX, 0.008, z]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+              <planeGeometry args={[0.34, 0.045]} />
+              <meshBasicMaterial color="#f8fafc" transparent opacity={0.85} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {[
+        [westRoadX - 0.75, 0, northRoadZ - 0.72],
+        [eastRoadX + 0.75, 0, northRoadZ - 0.72],
+        [westRoadX - 0.75, 0, southRoadZ + 0.72],
+        [eastRoadX + 0.75, 0, southRoadZ + 0.72],
+      ].map(([x, y, z], index) => (
+        <group key={`park-plot-${index}`} position={[x, y, z]}>
+          <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[parkWidth, parkDepth]} />
+            <meshStandardMaterial color="#4b7f41" roughness={0.98} metalness={0.01} />
+          </mesh>
+          <mesh position={[0, 0.03, 0]} castShadow receiveShadow>
+            <boxGeometry args={[parkWidth + 0.1, 0.06, parkDepth + 0.1]} />
+            <meshStandardMaterial color="#3f2f1f" roughness={0.9} metalness={0.08} />
+          </mesh>
+        </group>
+      ))}
+
+      {[
+        [westRoadX - 1.18, 0, northRoadZ - 0.95],
+        [westRoadX - 0.22, 0, northRoadZ - 0.4],
+        [eastRoadX + 0.22, 0, northRoadZ - 0.48],
+        [eastRoadX + 1.14, 0, northRoadZ - 0.93],
+        [westRoadX - 1.12, 0, southRoadZ + 0.95],
+        [westRoadX - 0.22, 0, southRoadZ + 0.44],
+        [eastRoadX + 0.24, 0, southRoadZ + 0.46],
+        [eastRoadX + 1.15, 0, southRoadZ + 0.9],
+      ].map(([x, y, z], index) => (
+        <StreetTree
+          key={`street-tree-${index}`}
+          position={[x, y, z]}
+          canopyColor={index % 2 === 0 ? "#3f9142" : "#4ea34a"}
+        />
+      ))}
+
+      {[
+        [localOfficeCenterX - 2.2, 0, northRoadZ + 0.05, 0, "#e53935"],
+        [localOfficeCenterX + 1.1, 0, northRoadZ - 0.06, 0, "#1d4ed8"],
+        [localOfficeCenterX - 1.4, 0, southRoadZ + 0.08, Math.PI, "#f59e0b"],
+        [localOfficeCenterX + 2.35, 0, southRoadZ - 0.05, Math.PI, "#16a34a"],
+        [westRoadX + 0.02, 0, localOfficeCenterZ - 1.7, -Math.PI / 2, "#8b5cf6"],
+        [westRoadX - 0.03, 0, localOfficeCenterZ + 1.6, -Math.PI / 2, "#ef4444"],
+        [eastRoadX - 0.02, 0, localOfficeCenterZ - 1.2, Math.PI / 2, "#0284c7"],
+        [eastRoadX + 0.03, 0, localOfficeCenterZ + 1.95, Math.PI / 2, "#f97316"],
+      ].map(([x, y, z, rotationY, bodyColor], index) => (
+        <CompactCar
+          key={`city-car-${index}`}
+          position={[x as number, y as number, z as number]}
+          rotationY={rotationY as number}
+          bodyColor={bodyColor as string}
+        />
+      ))}
 
       {gymZoneFloorWidth > 0 && roomZoneFloorHeight > 0 ? (
         <>

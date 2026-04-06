@@ -64,6 +64,17 @@ export type RenderAgent = SceneActor & {
   janitorPauseUntil?: number;
 };
 
+export type PicturePropAsset = {
+  fileName: string;
+  imageDataUrl: string;
+  aspectRatio: number;
+  dominantColor: string;
+  accentColor: string;
+  frameColor: string;
+  pixelWidth: number;
+  pixelHeight: number;
+};
+
 export type FurnitureItem = {
   _uid: string;
   type: string;
@@ -77,6 +88,7 @@ export type FurnitureItem = {
   facing?: number;
   vertical?: boolean;
   elevation?: number;
+  pictureAsset?: PicturePropAsset | null;
 };
 
 export type FurnitureSeed = Omit<FurnitureItem, "_uid">;

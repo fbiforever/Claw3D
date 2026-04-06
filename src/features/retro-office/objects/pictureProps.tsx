@@ -1,6 +1,5 @@
 "use client";
 
-import { useTexture } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { SCALE } from "@/features/retro-office/core/constants";
@@ -12,7 +11,6 @@ import {
 import {
   buildPicturePropGroup,
   PICTURE_PROP_TYPE,
-  createStyledPictureTexture,
   resolvePicturePropFootprint,
 } from "@/features/retro-office/core/pictureAsset";
 import type { FurnitureItem } from "@/features/retro-office/core/types";
@@ -35,9 +33,6 @@ const disposeObject3D = (object: THREE.Object3D) => {
     }
   });
 };
-
-const EMPTY_TEXTURE_DATA_URL =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 const applyHighlight = ({
   editMode,
@@ -72,17 +67,10 @@ const applyHighlight = ({
 
 const buildStyledObject = (
   item: FurnitureItem,
-  texture: THREE.Texture,
   overrideAsset = item.pictureAsset,
 ) => {
   if (!overrideAsset) return null;
-  const { width, height } = getItemBaseSize(item);
-  return buildPicturePropGroup({
-    asset: overrideAsset,
-    footprintDepth: height * SCALE,
-    footprintWidth: width * SCALE,
-    texture: createStyledPictureTexture(texture),
-  });
+  return buildPicturePropGroup(overrideAsset);
 };
 
 export function PicturePropModel({
@@ -96,11 +84,9 @@ export function PicturePropModel({
   onClick,
 }: InteractiveFurnitureModelProps) {
   const asset = item.pictureAsset;
-  const imageDataUrl = asset?.imageDataUrl ?? EMPTY_TEXTURE_DATA_URL;
-  const sourceTexture = useTexture(imageDataUrl);
   const modelObject = useMemo(
-    () => buildStyledObject(item, sourceTexture),
-    [item, sourceTexture],
+    () => buildStyledObject(item),
+    [item],
   );
   const [wx, , wz] = toWorld(item.x, item.y);
   const { width, height } = getItemBaseSize(item);
@@ -163,7 +149,6 @@ export function PicturePropGhost({
   asset: NonNullable<FurnitureItem["pictureAsset"]>;
   position: [number, number, number];
 }) {
-  const sourceTexture = useTexture(asset.imageDataUrl);
   const footprint = resolvePicturePropFootprint(asset.aspectRatio);
   const ghostItem = useMemo<FurnitureItem>(
     () => ({
@@ -178,8 +163,8 @@ export function PicturePropGhost({
     [asset, footprint.depthUnits, footprint.widthUnits],
   );
   const modelObject = useMemo(
-    () => buildStyledObject(ghostItem, sourceTexture, asset),
-    [asset, ghostItem, sourceTexture],
+    () => buildStyledObject(ghostItem, asset),
+    [asset, ghostItem],
   );
   const pivotX = footprint.widthUnits * SCALE * 0.5;
   const pivotZ = footprint.depthUnits * SCALE * 0.5;

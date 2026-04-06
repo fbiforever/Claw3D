@@ -3,7 +3,11 @@
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { SCALE } from "@/features/retro-office/core/constants";
-import type { PicturePropAsset } from "@/features/retro-office/core/types";
+import type {
+  Picture3dPrimitive,
+  Picture3dRecipe,
+  PicturePropAsset,
+} from "@/features/retro-office/core/types";
 
 export const PICTURE_PROP_TYPE = "picture_prop";
 
@@ -12,7 +16,11 @@ const MIN_PIXEL_WIDTH = 20;
 const MAX_PIXEL_WIDTH = 44;
 const MIN_PIXEL_HEIGHT = 20;
 const MAX_PIXEL_HEIGHT = 44;
-const PICTURE_PROP_DEPTH_UNITS = 24;
+const PICTURE_PROP_DEPTH_UNITS = 30;
+const DEFAULT_PALETTE = {
+  accentColor: "#d97706",
+  dominantColor: "#7c5c3b",
+} as const;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -108,11 +116,7 @@ export const derivePicturePalette = (rgba: ArrayLike<number>) => {
   }
 
   if (visiblePixels === 0 || buckets.size === 0) {
-    return {
-      accentColor: "#d97706",
-      dominantColor: "#7c5c3b",
-      frameColor: "#24170d",
-    };
+    return { ...DEFAULT_PALETTE };
   }
 
   const dominantBucket =
@@ -160,7 +164,7 @@ const loadImageElement = (src: string) =>
     image.src = src;
   });
 
-const renderCoverImage = (
+const renderPreviewImage = (
   context: CanvasRenderingContext2D,
   image: CanvasImageSource,
   targetWidth: number,
@@ -219,16 +223,95 @@ export const getPicturePropGlbFileName = (asset: PicturePropAsset) =>
 
 export const resolvePicturePropFootprint = (aspectRatio: number) => {
   const safeAspect = clamp(Number.isFinite(aspectRatio) ? aspectRatio : 1, 0.65, 1.9);
-  const widthUnits = Math.round(36 + (safeAspect - 0.65) * 16);
+  const widthUnits = Math.round(44 + (safeAspect - 0.65) * 18);
   return {
     depthUnits: PICTURE_PROP_DEPTH_UNITS,
-    widthUnits: clamp(widthUnits, 34, 58),
+    widthUnits: clamp(widthUnits, 40, 66),
+  };
+};
+
+export const buildFallbackGeneratedModel = (
+  palette: Pick<PicturePropAsset, "accentColor" | "dominantColor">,
+  aspectRatio: number,
+): Picture3dRecipe => {
+  const safeAspect = clamp(aspectRatio, 0.65, 1.9);
+  const width = clamp(1.1 + (safeAspect - 1) * 0.22, 0.86, 1.42);
+  const depth = 0.72;
+  const towerWidth = clamp(width * 0.28, 0.22, 0.34);
+  const headWidth = clamp(width * 0.5, 0.32, 0.58);
+  const highlightWidth = clamp(width * 0.14, 0.08, 0.18);
+  return {
+    title: "AI office sculpture",
+    summary:
+      "retro office collectible with chunky low-poly forms, matte materials, soft bevels, and furniture-like proportions.",
+    footprintMeters: {
+      width,
+      depth,
+      height: 1.66,
+    },
+    primitives: [
+      {
+        kind: "box",
+        size: [width, 0.22, depth],
+        position: [0, 0.11, 0],
+        material: {
+          color: palette.accentColor,
+          roughness: 0.82,
+        },
+      },
+      {
+        kind: "box",
+        size: [width * 0.74, 0.92, depth * 0.7],
+        position: [0, 0.68, -0.02],
+        material: {
+          color: palette.dominantColor,
+          roughness: 0.76,
+        },
+      },
+      {
+        kind: "box",
+        size: [headWidth, 0.36, depth * 0.44],
+        position: [0, 1.3, 0.04],
+        material: {
+          color: mixColors(palette.dominantColor, "#f6efe1", 0.3),
+          roughness: 0.74,
+        },
+      },
+      {
+        kind: "box",
+        size: [towerWidth, 0.54, depth * 0.44],
+        position: [-(width * 0.22), 0.86, 0.12],
+        material: {
+          color: mixColors(palette.dominantColor, "#0f0a06", 0.72),
+        roughness: 0.82,
+        },
+      },
+      {
+        kind: "box",
+        size: [towerWidth, 0.62, depth * 0.36],
+        position: [width * 0.22, 0.78, -0.08],
+        material: {
+          color: mixColors(mixColors(palette.dominantColor, "#0f0a06", 0.72), palette.dominantColor, 0.24),
+          roughness: 0.78,
+        },
+      },
+      {
+        kind: "box",
+        size: [highlightWidth, 0.68, depth * 0.8],
+        position: [width * 0.34, 0.78, 0.05],
+        material: {
+          color: mixColors(palette.accentColor, "#f8d34d", 0.24),
+          roughness: 0.66,
+          metalness: 0.1,
+        },
+      },
+    ],
   };
 };
 
 export const createPictureAssetFromFile = async (file: File) => {
   if (!file.type.startsWith("image/")) {
-    throw new Error("Only image uploads are supported for picture props.");
+    throw new Error("Only image uploads are supported for 3D generation.");
   }
 
   const objectUrl = URL.createObjectURL(file);
@@ -254,7 +337,7 @@ export const createPictureAssetFromFile = async (file: File) => {
       throw new Error("Could not create an image processing context.");
     }
     sourceContext.imageSmoothingEnabled = true;
-    renderCoverImage(sourceContext, image, pixelWidth, pixelHeight);
+    renderPreviewImage(sourceContext, image, pixelWidth, pixelHeight);
 
     const previewScale = Math.max(
       1,
@@ -279,7 +362,6 @@ export const createPictureAssetFromFile = async (file: File) => {
     const palette = derivePicturePalette(
       sourceContext.getImageData(0, 0, pixelWidth, pixelHeight).data,
     );
-
     return {
       ...palette,
       aspectRatio,
@@ -287,90 +369,145 @@ export const createPictureAssetFromFile = async (file: File) => {
       imageDataUrl: previewCanvas.toDataURL("image/webp", 0.86),
       pixelHeight,
       pixelWidth,
+      provider: "preview",
+      model: "local-fallback",
+      summary:
+        "Local preview generated. Upload will request an AI low-poly office asset recipe.",
+      recipe: buildFallbackGeneratedModel(palette, aspectRatio),
     } satisfies PicturePropAsset;
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
 };
 
-type PicturePropDimensions = {
-  artHeight: number;
-  artWidth: number;
-  backdropDepth: number;
-  backdropHeight: number;
-  backdropWidth: number;
-  baseDepth: number;
-  baseHeight: number;
-  baseWidth: number;
-  braceLength: number;
-  braceTilt: number;
-  frameDepth: number;
-  frameHeight: number;
-  frameInset: number;
-  frameThickness: number;
-  frameWidth: number;
-  supportHeight: number;
-  supportWidth: number;
+const clampPrimitiveSize = (value: number, fallback: number, min: number, max: number) =>
+  clamp(Number.isFinite(value) ? value : fallback, min, max);
+
+const clampPrimitivePosition = (value: number, fallback = 0, min = -1.5, max = 1.8) =>
+  clamp(Number.isFinite(value) ? value : fallback, min, max);
+
+const clampPrimitiveRotation = (value: number, fallback = 0) =>
+  clamp(Number.isFinite(value) ? value : fallback, -Math.PI, Math.PI);
+
+const normalizeHexColor = (value: string | undefined, fallback: string) => {
+  const raw = value?.trim() ?? "";
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) {
+    return fallback;
+  }
+  if (raw.length === 4) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`.toLowerCase();
+  }
+  return raw.toLowerCase();
 };
 
-export const resolvePicturePropDimensions = (params: {
-  aspectRatio: number;
-  footprintDepth: number;
-  footprintWidth: number;
-}): PicturePropDimensions => {
-  const safeAspect = clamp(Number.isFinite(params.aspectRatio) ? params.aspectRatio : 1, 0.65, 1.9);
-  let artWidth = clamp(params.footprintWidth * 0.78, 0.48, 1.16);
-  let artHeight = artWidth / safeAspect;
-  if (artHeight > 1.08) {
-    artHeight = 1.08;
-    artWidth = artHeight * safeAspect;
+export const sanitizeGeneratedPrimitive = (
+  primitive: Picture3dPrimitive,
+  palette: Pick<PicturePropAsset, "accentColor" | "dominantColor">,
+  index: number,
+): Picture3dPrimitive => {
+  const fallbackColor =
+    index === 0
+      ? palette.dominantColor
+      : index % 3 === 0
+        ? palette.accentColor
+        : mixColors(palette.dominantColor, "#0f0a06", 0.72);
+  const material = {
+    color: normalizeHexColor(primitive.material?.color, fallbackColor),
+    metalness: clamp(primitive.material?.metalness ?? 0.08, 0, 0.35),
+    roughness: clamp(primitive.material?.roughness ?? 0.76, 0.4, 1),
+  };
+  const rotation = primitive.rotation
+    ? ([
+        clampPrimitiveRotation(primitive.rotation[0] ?? Number.NaN),
+        clampPrimitiveRotation(primitive.rotation[1] ?? Number.NaN),
+        clampPrimitiveRotation(primitive.rotation[2] ?? Number.NaN),
+      ] as [number, number, number])
+    : undefined;
+  const position = [
+    clampPrimitivePosition(primitive.position[0] ?? Number.NaN),
+    clampPrimitivePosition(primitive.position[1] ?? Number.NaN, 0.2, 0, 2.2),
+    clampPrimitivePosition(primitive.position[2] ?? Number.NaN),
+  ] as [number, number, number];
+  if (primitive.kind === "cylinder") {
+    return {
+      kind: "cylinder",
+      height: clampPrimitiveSize(primitive.height, 0.46, 0.08, 2.2),
+      radiusTop: clampPrimitiveSize(primitive.radiusTop, 0.18, 0.04, 0.8),
+      radiusBottom: clampPrimitiveSize(primitive.radiusBottom, 0.18, 0.04, 0.8),
+      radialSegments: Math.round(clampPrimitiveSize(primitive.radialSegments ?? 16, 16, 8, 24)),
+      position,
+      ...(rotation ? { rotation } : {}),
+      material,
+    };
   }
-  if (artHeight < 0.56) {
-    artHeight = 0.56;
-    artWidth = artHeight * safeAspect;
+  if (primitive.kind === "sphere") {
+    return {
+      kind: "sphere",
+      radius: clampPrimitiveSize(primitive.radius, 0.24, 0.04, 0.8),
+      widthSegments: Math.round(clampPrimitiveSize(primitive.widthSegments ?? 16, 16, 8, 24)),
+      heightSegments: Math.round(clampPrimitiveSize(primitive.heightSegments ?? 16, 16, 8, 24)),
+      position,
+      ...(rotation ? { rotation } : {}),
+      material,
+    };
   }
-  const frameThickness = clamp(artWidth * 0.085, 0.045, 0.085);
-  const frameInset = frameThickness * 0.68;
-  const frameWidth = artWidth + frameThickness * 2;
-  const frameHeight = artHeight + frameThickness * 2;
-  const frameDepth = 0.08;
-  const baseHeight = 0.08;
-  const baseWidth = clamp(frameWidth * 0.72, 0.34, params.footprintWidth * 0.92);
-  const baseDepth = clamp(params.footprintDepth * 0.72, 0.2, 0.34);
-  const supportHeight = clamp(frameHeight * 0.84, 0.56, 1.08);
-  const supportWidth = clamp(frameWidth * 0.12, 0.05, 0.09);
   return {
-    artHeight,
-    artWidth,
-    backdropDepth: 0.03,
-    backdropHeight: frameHeight * 0.96,
-    backdropWidth: frameWidth * 0.96,
-    baseDepth,
-    baseHeight,
-    baseWidth,
-    braceLength: clamp(frameHeight * 0.55, 0.38, 0.62),
-    braceTilt: 0.68,
-    frameDepth,
-    frameHeight,
-    frameInset,
-    frameThickness,
-    frameWidth,
-    supportHeight,
-    supportWidth,
+    kind: "box",
+    size: [
+      clampPrimitiveSize(primitive.size[0] ?? Number.NaN, 0.46, 0.08, 1.8),
+      clampPrimitiveSize(primitive.size[1] ?? Number.NaN, 0.46, 0.08, 2.2),
+      clampPrimitiveSize(primitive.size[2] ?? Number.NaN, 0.46, 0.08, 1.8),
+    ],
+    position,
+    ...(rotation ? { rotation } : {}),
+    material,
   };
 };
 
-const applyPictureTextureStyle = (texture: THREE.Texture) => {
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
-  texture.needsUpdate = true;
-  return texture;
+export const sanitizeGeneratedModel = (
+  model: Picture3dRecipe | null | undefined,
+  asset: Pick<
+    PicturePropAsset,
+    | "accentColor"
+    | "aspectRatio"
+    | "dominantColor"
+    | "fileName"
+    | "recipe"
+  >,
+): Picture3dRecipe => {
+  const fallback = buildFallbackGeneratedModel(
+    {
+      accentColor: asset.accentColor,
+      dominantColor: asset.dominantColor,
+    },
+    asset.aspectRatio,
+  );
+  if (!model) return fallback;
+  const primitives: Picture3dPrimitive[] = Array.isArray(model.primitives)
+    ? model.primitives
+        .slice(0, 16)
+        .map((primitive: Picture3dPrimitive, index: number) =>
+          sanitizeGeneratedPrimitive(
+            primitive,
+            {
+              accentColor: asset.accentColor,
+              dominantColor: asset.dominantColor,
+            },
+            index,
+          ),
+        )
+    : fallback.primitives;
+  return {
+    title: model.title?.trim() || sanitizeBaseFileName(asset.fileName),
+    summary: model.summary?.trim() || fallback.summary,
+    footprintMeters: {
+      width: clamp(model.footprintMeters?.width ?? fallback.footprintMeters.width, 0.6, 1.8),
+      depth: clamp(model.footprintMeters?.depth ?? fallback.footprintMeters.depth, 0.4, 1.4),
+      height: clamp(model.footprintMeters?.height ?? fallback.footprintMeters.height, 0.8, 2.1),
+    },
+    primitives: primitives.length > 0 ? primitives : fallback.primitives,
+  };
 };
-
-export const createStyledPictureTexture = (texture: THREE.Texture) =>
-  applyPictureTextureStyle(texture.clone());
 
 const createStandardMaterial = (
   color: string,
@@ -379,135 +516,70 @@ const createStandardMaterial = (
   new THREE.MeshStandardMaterial({
     color,
     metalness: 0.08,
-    roughness: 0.72,
+    roughness: 0.76,
     ...overrides,
   });
 
-type BuildPicturePropGroupParams = {
-  asset: PicturePropAsset;
-  footprintDepth: number;
-  footprintWidth: number;
-  texture: THREE.Texture;
+const createPrimitiveGeometry = (primitive: Picture3dPrimitive) => {
+  switch (primitive.kind) {
+    case "sphere":
+      return new THREE.SphereGeometry(
+        clamp(primitive.radius, 0.05, 0.9),
+        primitive.widthSegments ?? 18,
+        primitive.heightSegments ?? 18,
+      );
+    case "cylinder":
+      return new THREE.CylinderGeometry(
+        clamp(primitive.radiusTop, 0.04, 0.8),
+        clamp(primitive.radiusBottom, 0.04, 0.8),
+        clamp(primitive.height, 0.08, 2.2),
+        primitive.radialSegments ?? 18,
+      );
+    case "box":
+    default:
+      return new THREE.BoxGeometry(
+        clamp(primitive.size[0], 0.08, 1.8),
+        clamp(primitive.size[1], 0.08, 2.2),
+        clamp(primitive.size[2], 0.08, 1.8),
+      );
+  }
 };
 
-export const buildPicturePropGroup = ({
-  asset,
-  footprintDepth,
-  footprintWidth,
-  texture,
-}: BuildPicturePropGroupParams) => {
-  const dominantShadow = mixColors(asset.dominantColor, "#111827", 0.42);
-  const accentShadow = mixColors(asset.accentColor, "#111827", 0.28);
-  const dims = resolvePicturePropDimensions({
-    aspectRatio: asset.aspectRatio,
-    footprintDepth,
-    footprintWidth,
-  });
+export const buildPicturePropGroup = (asset: PicturePropAsset) => {
+  const model = sanitizeGeneratedModel(asset.recipe, asset);
+  const footprint = resolvePicturePropFootprint(asset.aspectRatio);
+  const widthScale = (footprint.widthUnits * SCALE) / Math.max(model.footprintMeters.width, 0.1);
+  const depthScale = (footprint.depthUnits * SCALE) / Math.max(model.footprintMeters.depth, 0.1);
+  const heightScale = 1.55 / Math.max(model.footprintMeters.height, 0.1);
+  const uniformScale = clamp(Math.min(widthScale, depthScale, heightScale), 0.4, 1.6);
   const group = new THREE.Group();
-  const frameCenterY = dims.baseHeight + dims.frameHeight * 0.5 + 0.18;
 
-  const applySharedFlags = (mesh: THREE.Mesh) => {
+  for (const primitive of model.primitives) {
+    const geometry = createPrimitiveGeometry(primitive);
+    const material = createStandardMaterial(primitive.material.color, {
+      metalness: primitive.material.metalness ?? 0.08,
+      roughness: primitive.material.roughness ?? 0.76,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(
+      primitive.position[0] * uniformScale,
+      primitive.position[1] * uniformScale,
+      primitive.position[2] * uniformScale,
+    );
+    mesh.rotation.set(
+      primitive.rotation?.[0] ?? 0,
+      primitive.rotation?.[1] ?? 0,
+      primitive.rotation?.[2] ?? 0,
+    );
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    return mesh;
-  };
+    group.add(mesh);
+  }
 
-  const base = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(dims.baseWidth, dims.baseHeight, dims.baseDepth),
-      createStandardMaterial(asset.accentColor, { roughness: 0.78 }),
-    ),
-  );
-  base.position.set(0, dims.baseHeight * 0.5, 0);
-  group.add(base);
-
-  const support = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(dims.supportWidth, dims.supportHeight, 0.07),
-      createStandardMaterial(dominantShadow, { roughness: 0.82 }),
-    ),
-  );
-  support.position.set(0, dims.baseHeight + dims.supportHeight * 0.5, -0.02);
-  group.add(support);
-
-  const brace = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(dims.supportWidth * 0.8, dims.braceLength, 0.06),
-      createStandardMaterial(accentShadow, { roughness: 0.76 }),
-    ),
-  );
-  brace.position.set(0, dims.baseHeight + dims.braceLength * 0.55, -dims.baseDepth * 0.2);
-  brace.rotation.x = -dims.braceTilt;
-  group.add(brace);
-
-  const backdrop = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        dims.backdropWidth,
-        dims.backdropHeight,
-        dims.backdropDepth,
-      ),
-      createStandardMaterial(mixColors(asset.dominantColor, "#efe6d8", 0.18), {
-        roughness: 0.9,
-      }),
-    ),
-  );
-  backdrop.position.set(0, frameCenterY, -0.01);
-  group.add(backdrop);
-
-  const frame = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(dims.frameWidth, dims.frameHeight, dims.frameDepth),
-      createStandardMaterial(asset.frameColor, {
-        metalness: 0.12,
-        roughness: 0.7,
-      }),
-    ),
-  );
-  frame.position.set(0, frameCenterY, 0);
-  group.add(frame);
-
-  const innerPanel = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        dims.frameWidth - dims.frameInset * 2,
-        dims.frameHeight - dims.frameInset * 2,
-        dims.frameDepth * 0.52,
-      ),
-      createStandardMaterial(mixColors(asset.dominantColor, "#f6efe1", 0.32), {
-        roughness: 0.92,
-      }),
-    ),
-  );
-  innerPanel.position.set(0, frameCenterY, dims.frameDepth * 0.06);
-  group.add(innerPanel);
-
-  const artPlane = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.PlaneGeometry(dims.artWidth, dims.artHeight),
-      createStandardMaterial("#ffffff", {
-        map: texture,
-        metalness: 0.02,
-        roughness: 0.9,
-        side: THREE.DoubleSide,
-      }),
-    ),
-  );
-  artPlane.position.set(0, frameCenterY, dims.frameDepth * 0.5 + 0.002);
-  group.add(artPlane);
-
-  const topCap = applySharedFlags(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(dims.frameWidth * 0.18, 0.06, dims.frameDepth * 0.78),
-      createStandardMaterial(accentShadow, {
-        metalness: 0.16,
-        roughness: 0.62,
-      }),
-    ),
-  );
-  topCap.position.set(0, frameCenterY + dims.frameHeight * 0.5 + 0.01, -0.008);
-  group.add(topCap);
-
+  const boundingBox = new THREE.Box3().setFromObject(group);
+  const center = boundingBox.getCenter(new THREE.Vector3());
+  const minY = boundingBox.min.y;
+  group.position.set(-center.x, Math.max(0, -minY), -center.z);
   return group;
 };
 
@@ -529,21 +601,8 @@ export const buildPicturePropItem = (
   };
 };
 
-const loadTexture = async (imageDataUrl: string) => {
-  const loader = new THREE.TextureLoader();
-  const texture = await loader.loadAsync(imageDataUrl);
-  return applyPictureTextureStyle(texture);
-};
-
 export const exportPictureAssetToGlb = async (asset: PicturePropAsset) => {
-  const footprint = resolvePicturePropFootprint(asset.aspectRatio);
-  const texture = await loadTexture(asset.imageDataUrl);
-  const group = buildPicturePropGroup({
-    asset,
-    footprintDepth: footprint.depthUnits * SCALE,
-    footprintWidth: footprint.widthUnits * SCALE,
-    texture,
-  });
+  const group = buildPicturePropGroup(asset);
   const exporter = new GLTFExporter();
   const binary = await new Promise<ArrayBuffer>((resolve, reject) => {
     exporter.parse(
@@ -553,18 +612,15 @@ export const exportPictureAssetToGlb = async (asset: PicturePropAsset) => {
           resolve(result);
           return;
         }
-        reject(new Error("Picture prop export did not return a binary GLB."));
+        reject(new Error("3D generation export did not return a binary GLB."));
       },
       (error) => {
         reject(
-          error instanceof Error
-            ? error
-            : new Error("Picture prop export failed."),
+          error instanceof Error ? error : new Error("3D generation export failed."),
         );
       },
       {
         binary: true,
-        maxTextureSize: 1024,
         onlyVisible: false,
       },
     );

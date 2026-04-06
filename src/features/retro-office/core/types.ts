@@ -64,15 +64,67 @@ export type RenderAgent = SceneActor & {
   janitorPauseUntil?: number;
 };
 
+export type Picture3dMaterial = {
+  color: string;
+  roughness?: number;
+  metalness?: number;
+};
+
+export type Picture3dPrimitiveBase = {
+  material: Picture3dMaterial;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+};
+
+export type Picture3dBoxPrimitive = Picture3dPrimitiveBase & {
+  kind: "box";
+  size: [number, number, number];
+};
+
+export type Picture3dCylinderPrimitive = Picture3dPrimitiveBase & {
+  kind: "cylinder";
+  radiusBottom: number;
+  radiusTop: number;
+  height: number;
+  radialSegments?: number;
+};
+
+export type Picture3dSpherePrimitive = Picture3dPrimitiveBase & {
+  kind: "sphere";
+  radius: number;
+  widthSegments?: number;
+  heightSegments?: number;
+};
+
+export type Picture3dPrimitive =
+  | Picture3dBoxPrimitive
+  | Picture3dCylinderPrimitive
+  | Picture3dSpherePrimitive;
+
+export type Picture3dRecipe = {
+  title: string;
+  summary: string;
+  footprintMeters: {
+    width: number;
+    depth: number;
+    height: number;
+  };
+  primitives: Picture3dPrimitive[];
+};
+
 export type PicturePropAsset = {
   fileName: string;
   imageDataUrl: string;
+  sourceImageDataUrl?: string;
   aspectRatio: number;
   dominantColor: string;
   accentColor: string;
-  frameColor: string;
   pixelWidth: number;
   pixelHeight: number;
+  provider: string;
+  model: string;
+  summary: string;
+  recipe: Picture3dRecipe;
 };
 
 export type FurnitureItem = {

@@ -4996,13 +4996,29 @@ export function RetroOffice3D({
       setPictureDraftStatus("processing");
       setPictureDraftError(null);
       try {
-        const asset = await createPictureAssetFromFile(file);
-        setPictureDraft(asset);
+        const previewAsset = await createPictureAssetFromFile(file);
+        const formData = new FormData();
+        formData.set("image", file);
+        formData.set("previewDataUrl", previewAsset.imageDataUrl);
+        const response = await fetch("/api/office/picture-model", {
+          method: "POST",
+          body: formData,
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | {
+              asset?: PicturePropAsset;
+              error?: string;
+            }
+          | null;
+        if (!response.ok || !payload?.asset) {
+          throw new Error(payload?.error || "AI 3D reconstruction failed.");
+        }
+        setPictureDraft(payload.asset);
       } catch (error) {
         setPictureDraftError(
           error instanceof Error
             ? error.message
-            : "Picture processing failed.",
+            : "Picture model generation failed.",
         );
       } finally {
         setPictureDraftStatus("idle");
@@ -7130,7 +7146,7 @@ export function RetroOffice3D({
           {selectedPictureAsset ? (
             <div className="mt-3 border-t border-amber-900/20 pt-3">
               <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-500/65">
-                Picture to GLB
+                AI Model to GLB
               </div>
               <div className="relative h-24 w-full overflow-hidden rounded-md border border-amber-800/20">
                 <Image
@@ -7199,10 +7215,10 @@ export function RetroOffice3D({
           </div>
           <div className="mt-3 rounded-lg border border-amber-800/20 bg-[#120e08] p-3">
             <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-500/65">
-              Picture Lab
+              Image to 3D Lab
             </div>
             <div className="mt-1 text-[10px] leading-relaxed text-amber-500/55">
-              Upload any picture, stylize it into a matte office prop, then export the same model as a GLB.
+              Upload a picture and let AI reconstruct it as a simplified 3D office asset, then export that model as a GLB.
             </div>
             {pictureDraft ? (
               <div className="relative mt-3 h-24 w-full overflow-hidden rounded-md border border-amber-800/20">
@@ -7266,7 +7282,7 @@ export function RetroOffice3D({
                     : "border-amber-900/20 bg-[#16100a] text-amber-400/40"
                 }`}
               >
-                <span>Place in Office</span>
+                <span>Generate and Place</span>
               </button>
             </div>
           </div>

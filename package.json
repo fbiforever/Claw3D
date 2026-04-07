@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node server/index.js --dev",
     "dev:https": "node server/index.js --dev --https",
+    "bg-adapter": "node server/bg-intelligence-adapter.js",
+    "bg-setup": "node scripts/bg-setup.js",
     "hermes-adapter": "node server/hermes-gateway-adapter.js",
     "demo-gateway": "node server/demo-gateway-adapter.js",
     "build": "next build",

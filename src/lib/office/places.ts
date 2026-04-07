@@ -82,6 +82,18 @@ export const DEFAULT_SKILL_TRIGGER_FALLBACKS_BY_SKILL_KEY: Record<
   string,
   DefaultSkillTriggerFallback
 > = {
+  "amazon-ordering": {
+    anyPhrases: [
+      "amazon",
+      "buy on amazon",
+      "order on amazon",
+      "reorder on amazon",
+      "amazon order history",
+      "amazon return",
+    ],
+    movementTarget: "desk",
+    skipIfAlreadyThere: true,
+  },
   "todo-board": {
     anyPhrases: [
       "todo",

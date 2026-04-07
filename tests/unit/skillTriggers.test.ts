@@ -12,6 +12,9 @@ import {
 
 describe("skill triggers", () => {
   it("parses packaged skill trigger definitions from SKILL.md", () => {
+    const amazonTrigger = listPackagedSkillTriggerDefinitions().find(
+      (entry) => entry.skillKey === "amazon-ordering",
+    );
     const todoTrigger = listPackagedSkillTriggerDefinitions().find(
       (entry) => entry.skillKey === "todo-board",
     );
@@ -19,6 +22,10 @@ describe("skill triggers", () => {
       (entry) => entry.skillKey === "task-manager",
     );
 
+    expect(amazonTrigger).not.toBeUndefined();
+    expect(amazonTrigger?.movementTarget).toBe("desk");
+    expect(amazonTrigger?.activationPhrases).toContain("amazon");
+    expect(amazonTrigger?.activationPhrases).toContain("amazon return");
     expect(todoTrigger).not.toBeUndefined();
     expect(todoTrigger?.movementTarget).toBe("desk");
     expect(todoTrigger?.activationPhrases).toContain("todo");
@@ -29,18 +36,18 @@ describe("skill triggers", () => {
   });
 
   it("matches the running agent's latest request against enabled skill triggers", () => {
-    const todoTrigger = listPackagedSkillTriggerDefinitions().find(
-      (entry) => entry.skillKey === "todo-board",
+    const amazonTrigger = listPackagedSkillTriggerDefinitions().find(
+      (entry) => entry.skillKey === "amazon-ordering",
     );
 
     const matched = resolveTriggeredSkillDefinition({
       isAgentRunning: true,
-      lastUserMessage: "On telegram, add this to my todo list.",
+      lastUserMessage: "On telegram, can you buy this on Amazon for me?",
       transcriptEntries: [],
-      triggers: todoTrigger ? [todoTrigger] : [],
+      triggers: amazonTrigger ? [amazonTrigger] : [],
     });
 
-    expect(matched?.skillKey).toBe("todo-board");
+    expect(matched?.skillKey).toBe("amazon-ordering");
     expect(matched?.movementTarget).toBe("desk");
   });
 
@@ -66,6 +73,10 @@ describe("skill triggers", () => {
     expect(OFFICE_SKILL_TRIGGER_PLACE_REGISTRY.github.interactionTarget).toBe(
       "server_room",
     );
+    expect(
+      DEFAULT_SKILL_TRIGGER_FALLBACKS_BY_SKILL_KEY["amazon-ordering"]
+        ?.movementTarget,
+    ).toBe("desk");
     expect(
       DEFAULT_SKILL_TRIGGER_FALLBACKS_BY_SKILL_KEY["todo-board"]
         ?.movementTarget,

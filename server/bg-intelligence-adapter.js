@@ -517,7 +517,7 @@ function startAdapter() {
           payload: {
             type: "hello-ok",
             protocol: 3,
-            adapterType: "bg-intelligence",
+            adapterType: "openclaw",
             features: {
               methods: [
                 "agents.list", "agents.create", "agents.update", "agents.delete",
@@ -579,7 +579,8 @@ function startAdapter() {
     console.log(`  Agents    : ${CHAT_AGENTS.length} chat personas + ${SWARM_AGENTS.length} swarm workers`);
     console.log("──────────────────────────────────────────────");
     console.log(" Connect claw3D to: ws://localhost:" + ADAPTER_PORT);
-    console.log(" Select 'Custom / Other' provider in the connect screen");
+    console.log(" Select 'OpenClaw' provider in the connect screen");
+    console.log(" (token is auto-loaded from .env.local — no manual paste needed)");
     console.log("──────────────────────────────────────────────");
 
     // Activity polling — animates swarm agents in the 3D office
